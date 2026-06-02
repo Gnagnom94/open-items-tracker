@@ -1,8 +1,8 @@
 {
   "name": "open-items-tracker",
   "displayName": "Open Items Tracker",
-  "description": "Visualize, edit, and manage your open-items.md backlog inside VS Code. Full CRUD for modules, sub-sections, and items; drag-to-reorder; inline editing; sort strategies; and live file sync.",
-  "version": "0.0.4",
+  "description": "Visualize, edit, and manage your open-items.md backlog inside VS Code and Antigravity IDE. Full CRUD for modules, sub-sections, and items; drag-to-reorder; inline editing; sort strategies; and live file sync.",
+  "version": "0.0.5",
   "publisher": "Gnagnom94",
   "repository": {
     "type": "git",

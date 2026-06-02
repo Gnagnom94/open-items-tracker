@@ -4,6 +4,11 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.0.5] - 2026-06-02
+
+### Changed
+- Added Antigravity IDE as explicitly supported editor in README and package description
+
 ## [0.0.4] - 2026-06-02
 
 ### Changed
