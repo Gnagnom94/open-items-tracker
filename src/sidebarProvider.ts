@@ -3,7 +3,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parseDocument } from './parser';
 import { getHtml, getNoFileHtml, getErrorHtml } from './renderer';
-import { toggleItemInFile, editItemTextInFile, editHeaderInFile, reorderItemsInFile } from './fileEditor';
+import {
+  toggleItemInFile, editItemTextInFile, editHeaderInFile,
+  editItemNoteInFile, editModuleContextInFile,
+  reorderItemsInFile, reorderModulesInFile, reorderSubSectionsInFile,
+  addItemToFile, deleteItemFromFile,
+  addModuleToFile, deleteModuleFromFile,
+  addSubSectionToFile, deleteSubSectionFromFile,
+} from './fileEditor';
 import { getStoredPath, setStoredPath, onPathChange } from './store';
 import { readSettings } from './settings';
 
@@ -37,6 +44,26 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           if (fp && msg.rawLine && msg.newText) { this._try(() => editHeaderInFile(fp, msg.rawLine, msg.newText)); } break;
         case 'reorderItems':
           if (fp && msg.oldOrder && msg.newOrder) { this._try(() => reorderItemsInFile(fp, msg.oldOrder, msg.newOrder)); } break;
+        case 'editItemNote':
+          if (fp && msg.rawLine) { this._try(() => editItemNoteInFile(fp, msg.rawLine, msg.newNote || '')); } break;
+        case 'editModuleContext':
+          if (fp && msg.moduleRawLine && msg.newContext) { this._try(() => editModuleContextInFile(fp, msg.moduleRawLine, msg.newContext)); } break;
+        case 'addItem':
+          if (fp && msg.parentRawLine && msg.text) { this._try(() => addItemToFile(fp, msg.parentRawLine, msg.text)); } break;
+        case 'deleteItem':
+          if (fp && msg.rawLine) { this._try(() => deleteItemFromFile(fp, msg.rawLine)); } break;
+        case 'addModule':
+          if (fp && msg.title) { this._try(() => addModuleToFile(fp, msg.title)); } break;
+        case 'deleteModule':
+          if (fp && msg.moduleRawLine) { this._try(() => deleteModuleFromFile(fp, msg.moduleRawLine)); } break;
+        case 'addSubSection':
+          if (fp && msg.moduleRawLine && msg.title) { this._try(() => addSubSectionToFile(fp, msg.moduleRawLine, msg.title)); } break;
+        case 'deleteSubSection':
+          if (fp && msg.subRawLine) { this._try(() => deleteSubSectionFromFile(fp, msg.subRawLine)); } break;
+        case 'reorderModules':
+          if (fp && msg.oldOrder && msg.newOrder) { this._try(() => reorderModulesInFile(fp, msg.oldOrder, msg.newOrder)); } break;
+        case 'reorderSubSections':
+          if (fp && msg.moduleRawLine && msg.oldOrder && msg.newOrder) { this._try(() => reorderSubSectionsInFile(fp, msg.moduleRawLine, msg.oldOrder, msg.newOrder)); } break;
       }
     }, null, this._disposables);
 
