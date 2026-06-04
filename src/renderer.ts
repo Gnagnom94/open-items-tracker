@@ -1067,12 +1067,13 @@ function initItemReorder(root) {
     if (!item || item.classList.contains('git-deleted')) { return; }
     if (isModuleDrag || isSubDrag) { return; }
     isItemDrag=true; dragging=item; e.dataTransfer.effectAllowed='move';
+    e.dataTransfer.setData('text/plain', '');
     setTimeout(function(){ item.classList.add('dragging'); },0);
   });
   root.addEventListener('dragover', function(e){
     if (!isItemDrag) { return; }
-    var item = e.target.closest('.item[draggable="true"]');
-    if (!item||item===dragging) { return; }
+    var item = e.target.closest('.item');
+    if (!item||item===dragging||item.classList.contains('git-deleted')) { return; }
     e.preventDefault(); e.stopPropagation();
     root.querySelectorAll('.item').forEach(function(i){ i.classList.remove('drag-over-top','drag-over-bottom'); });
     var rect=item.getBoundingClientRect(); insertBefore=e.clientY<rect.top+rect.height/2;
@@ -1082,19 +1083,32 @@ function initItemReorder(root) {
     if (!root.contains(e.relatedTarget)) { root.querySelectorAll('.item').forEach(function(i){ i.classList.remove('drag-over-top','drag-over-bottom'); }); dragOverEl=null; }
   });
   root.addEventListener('drop', function(e){
-    e.stopPropagation();
-    root.querySelectorAll('.item').forEach(function(i){
-      i.classList.remove('dragging','drag-over-top','drag-over-bottom');
-      i.removeAttribute('draggable');
-    });
+    if (!isItemDrag) { return; }
+    e.preventDefault(); e.stopPropagation();
     isItemDrag=false;
-    if (!dragging||!dragOverEl) { dragging=null; dragOverEl=null; return; }
+    if (!dragging||!dragOverEl) {
+      root.querySelectorAll('.item').forEach(function(i){
+        i.classList.remove('dragging','drag-over-top','drag-over-bottom');
+        i.removeAttribute('draggable');
+      });
+      dragging=null; dragOverEl=null; return;
+    }
     var list=dragging.closest('.items-list'), tlist=dragOverEl.closest('.items-list');
-    if (!list||list!==tlist) { dragging=null; dragOverEl=null; return; }
+    if (!list||list!==tlist) {
+      root.querySelectorAll('.item').forEach(function(i){
+        i.classList.remove('dragging','drag-over-top','drag-over-bottom');
+        i.removeAttribute('draggable');
+      });
+      dragging=null; dragOverEl=null; return;
+    }
     var oldOrder=Array.from(list.querySelectorAll(':scope > .item:not(.git-deleted)')).map(function(i){ return decodeURIComponent(i.getAttribute('data-raw')||''); });
     if (insertBefore) { list.insertBefore(dragging,dragOverEl); } else { list.insertBefore(dragging,dragOverEl.nextSibling); }
     var newOrder=Array.from(list.querySelectorAll(':scope > .item:not(.git-deleted)')).map(function(i){ return decodeURIComponent(i.getAttribute('data-raw')||''); });
     vscode.postMessage({command:'reorderItems',oldOrder:oldOrder,newOrder:newOrder});
+    root.querySelectorAll('.item').forEach(function(i){
+      i.classList.remove('dragging','drag-over-top','drag-over-bottom');
+      i.removeAttribute('draggable');
+    });
     dragging=null; dragOverEl=null;
   });
   root.addEventListener('dragend', function(){

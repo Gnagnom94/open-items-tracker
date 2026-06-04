@@ -4,6 +4,11 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.0.8] - 2026-06-04
+
+### Fixed
+- Item drag-and-drop reorder broken after handle-based dragging refactor: the `dragover` handler was filtering drop targets with `[draggable="true"]`, but only the source item had that attribute, so the browser blocked every drop.
+
 ## [0.0.7] - 2026-06-04
 
 ### Changed
