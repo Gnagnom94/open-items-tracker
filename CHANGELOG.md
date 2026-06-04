@@ -4,6 +4,13 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.0.7] - 2026-06-04
+
+### Changed
+- Inline text editing is now triggered by a single click.
+- Double-clicking inside an active text input editor now allows selecting individual words instead of resetting the edit.
+- Drag-and-drop handles for modules, sub-sections, and items are now larger, easier to target, and styled with subtle idle opacity rising on hover.
+
 ## [0.0.6] - 2026-06-04
 
 ### Added

@@ -530,8 +530,8 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
 .module-header { display: flex; align-items: center; padding: 9px 12px; background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editor-background)); user-select: none; gap: 6px; }
 .module-header:hover { background: var(--vscode-list-hoverBackground); }
 
-.module-drag-handle { flex-shrink: 0; color: var(--vscode-descriptionForeground); opacity: 0; cursor: grab; font-size: 11px; line-height: 1.4; padding: 0 2px; user-select: none; transition: opacity 0.1s; }
-.module-header:hover .module-drag-handle { opacity: 0.6; }
+.module-drag-handle { flex-shrink: 0; color: var(--vscode-descriptionForeground); opacity: 0.25; cursor: grab; font-size: 15px; line-height: 1.4; padding: 0 10px; user-select: none; transition: opacity 0.1s; }
+.module-header:hover .module-drag-handle { opacity: 0.7; }
 
 .module-collapse { flex: 1; display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 0; }
 .module-title { font-weight: 600; font-size: 0.95em; flex: 1; cursor: text; }
@@ -554,8 +554,8 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
 .subsection.sub-drag-over-top    { border-top: 2px solid var(--vscode-focusBorder); }
 .subsection.sub-drag-over-bottom { border-bottom: 2px solid var(--vscode-focusBorder); }
 .subsection-header { display: flex; align-items: center; gap: 4px; padding: 3px 0; margin-bottom: 4px; border-bottom: 1px solid var(--vscode-panel-border); }
-.sub-drag-handle { flex-shrink: 0; color: var(--vscode-descriptionForeground); opacity: 0; cursor: grab; font-size: 10px; line-height: 1.4; padding: 0 2px; user-select: none; transition: opacity 0.1s; }
-.subsection-header:hover .sub-drag-handle { opacity: 0.6; }
+.sub-drag-handle { flex-shrink: 0; color: var(--vscode-descriptionForeground); opacity: 0.25; cursor: grab; font-size: 14px; line-height: 1.4; padding: 0 10px; user-select: none; transition: opacity 0.1s; }
+.subsection-header:hover .sub-drag-handle { opacity: 0.7; }
 .subsection-title { flex: 1; font-size: 0.78em; font-weight: 600; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.06em; cursor: text; }
 .subsection-title:hover { text-decoration: underline dotted; }
 
@@ -567,8 +567,8 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
 .item.drag-over-top    { border-top: 2px solid var(--vscode-focusBorder) !important; }
 .item.drag-over-bottom { border-bottom: 2px solid var(--vscode-focusBorder) !important; }
 
-.drag-handle { flex-shrink: 0; width: 10px; padding-top: 3px; color: var(--vscode-descriptionForeground); opacity: 0; cursor: grab; font-size: 11px; line-height: 1.4; transition: opacity 0.1s; user-select: none; }
-.item:hover .drag-handle { opacity: 0.6; }
+.drag-handle { flex-shrink: 0; width: 28px; padding: 3px 8px 0; text-align: center; color: var(--vscode-descriptionForeground); opacity: 0.25; cursor: grab; font-size: 15px; line-height: 1.4; transition: opacity 0.1s; user-select: none; }
+.item:hover .drag-handle { opacity: 0.7; }
 
 .item-checkbox { flex-shrink: 0; width: 14px; height: 14px; margin-top: 3px; cursor: pointer; accent-color: var(--vscode-testing-iconPassed, #4caf50); }
 .item-body { flex: 1; min-width: 0; }
@@ -811,8 +811,7 @@ function applyDomSort(strategy) {
     deletedItems.forEach(function(item){ list.appendChild(item); });
   });
   document.querySelectorAll('.item:not(.git-deleted)').forEach(function(item){
-    if (strategy==='manual') { item.setAttribute('draggable','true'); }
-    else { item.removeAttribute('draggable'); }
+    item.removeAttribute('draggable');
   });
 }
 
@@ -858,21 +857,21 @@ function renderItem(item, origIdx) {
   var noteDiff = (currentSettings && currentSettings.gitHighlight && currentSettings.gitShowInlineDiff && currentGitState && currentGitState.itemNoteDiffHtml[item.rawLine]);
   var noteHtml = '';
   if (noteDiff) {
-    noteHtml = '<div class="item-note" data-raw="'+rawKey+'" title="Double-click to edit">'+noteDiff+'</div>';
+    noteHtml = '<div class="item-note" data-raw="'+rawKey+'" title="Click to edit">'+noteDiff+'</div>';
   } else if (item.note) {
-    noteHtml = '<div class="item-note" data-raw="'+rawKey+'" title="Double-click to edit">'+esc(item.note)+'</div>';
+    noteHtml = '<div class="item-note" data-raw="'+rawKey+'" title="Click to edit">'+esc(item.note)+'</div>';
   }
   
   var textHtml = (currentSettings && currentSettings.gitHighlight && currentSettings.gitShowInlineDiff && currentGitState && currentGitState.itemDiffHtml[item.rawLine]) || esc(item.text);
 
   return (
-    '<li class="item' + gitClass + '" draggable="true" data-status="'+item.status+'" data-raw="'+rawKey+'" data-text="'+esc(item.text)+'" data-orig-idx="'+origIdx+'">' +
+    '<li class="item' + gitClass + '" data-status="'+item.status+'" data-raw="'+rawKey+'" data-text="'+esc(item.text)+'" data-orig-idx="'+origIdx+'">' +
       '<span class="drag-handle" title="Drag to reorder">&#8942;</span>' +
       '<input type="checkbox" class="item-checkbox"'+checked+'>' +
       statusSelect +
       '<div class="item-body">' +
         '<div class="'+textClass+'">' +
-          '<span class="item-text-content" title="Double-click to edit">'+textHtml+'</span>' +
+          '<span class="item-text-content" title="Click to edit">'+textHtml+'</span>' +
           dateHtml +
         '</div>' +
         noteHtml +
@@ -930,7 +929,7 @@ function renderModuleCard(mod, idx, settings) {
       '<div class="subsection" data-sub-raw="'+subRawKey+'">' +
         '<div class="subsection-header">' +
           '<span class="sub-drag-handle" title="Drag to reorder">&#8942;</span>' +
-          '<div class="subsection-title" data-raw="'+subRawKey+'" title="Double-click to edit">'+esc(sub.title)+'</div>' +
+          '<div class="subsection-title" data-raw="'+subRawKey+'" title="Click to edit">'+esc(sub.title)+'</div>' +
           '<button class="btn-delete" data-sub-raw="'+subRawKey+'" title="Delete sub-section">&#10005;</button>' +
         '</div>' +
         renderItems(sub.items, sub.rawLine||'') +
@@ -943,7 +942,7 @@ function renderModuleCard(mod, idx, settings) {
       '<div class="module-header">' +
         '<span class="module-drag-handle" title="Drag to reorder">&#8942;&#8942;</span>' +
         '<div class="module-collapse">' +
-          '<div class="module-title" data-raw="'+modRawKey+'" title="Double-click to edit">'+esc(mod.title)+'</div>' +
+          '<div class="module-title" data-raw="'+modRawKey+'" title="Click to edit">'+esc(mod.title)+'</div>' +
           '<div class="module-meta">' +
             '<div class="mini-progress"><div class="mini-progress-fill" style="width:'+pct+'%"></div></div>' +
             '<span class="module-count">'+ms.done+'/'+ms.total+'</span>' +
@@ -954,7 +953,7 @@ function renderModuleCard(mod, idx, settings) {
       '</div>' +
       '<div class="module-body">' +
         (mod.context
-          ? '<div class="module-context" data-mod-raw="'+modRawKey+'" title="Double-click to edit">'+esc(mod.context)+'</div>'
+          ? '<div class="module-context" data-mod-raw="'+modRawKey+'" title="Click to edit">'+esc(mod.context)+'</div>'
           : '') +
         (mod.subSections.length===0 ? renderItems(mod.items, mod.rawLine||'') : renderItems(mod.items, mod.rawLine||'')) +
         subHtml +
@@ -1008,7 +1007,8 @@ function startInlineEdit(el, originalText, onSave) {
 }
 
 function initInlineEdit(root) {
-  root.addEventListener('dblclick', function(e) {
+  root.addEventListener('click', function(e) {
+    if (e.target.closest('.inline-edit-input')) { return; }
     e.stopPropagation();
     var tc = e.target.closest('.item-text-content');
     if (tc) {
@@ -1053,6 +1053,14 @@ function initItemReorder(root) {
   var dragging=null, dragOverEl=null, insertBefore=true;
   root.addEventListener('mousedown', function(e){
     if (e.target.closest('.module-drag-handle') || e.target.closest('.sub-drag-handle')) { return; }
+    if (currentSort !== 'manual') { return; }
+    var handle = e.target.closest('.drag-handle');
+    if (handle) {
+      var item = handle.closest('.item');
+      if (item && !item.classList.contains('git-deleted')) {
+        item.setAttribute('draggable', 'true');
+      }
+    }
   });
   root.addEventListener('dragstart', function(e){
     var item = e.target.closest('.item[draggable="true"]');
@@ -1075,7 +1083,10 @@ function initItemReorder(root) {
   });
   root.addEventListener('drop', function(e){
     e.stopPropagation();
-    root.querySelectorAll('.item').forEach(function(i){ i.classList.remove('dragging','drag-over-top','drag-over-bottom'); });
+    root.querySelectorAll('.item').forEach(function(i){
+      i.classList.remove('dragging','drag-over-top','drag-over-bottom');
+      i.removeAttribute('draggable');
+    });
     isItemDrag=false;
     if (!dragging||!dragOverEl) { dragging=null; dragOverEl=null; return; }
     var list=dragging.closest('.items-list'), tlist=dragOverEl.closest('.items-list');
@@ -1088,8 +1099,14 @@ function initItemReorder(root) {
   });
   root.addEventListener('dragend', function(){
     isItemDrag=false;
-    if (dragging) { dragging.classList.remove('dragging'); }
-    root.querySelectorAll('.item').forEach(function(i){ i.classList.remove('drag-over-top','drag-over-bottom'); });
+    if (dragging) {
+      dragging.classList.remove('dragging');
+      dragging.removeAttribute('draggable');
+    }
+    root.querySelectorAll('.item').forEach(function(i){
+      i.classList.remove('drag-over-top','drag-over-bottom');
+      i.removeAttribute('draggable');
+    });
     dragging=null; dragOverEl=null;
   });
 }
@@ -1307,7 +1324,6 @@ function renderApp(data, settings, historyState, gitState) {
     btn.classList.toggle('active', btn.getAttribute('data-filter')===activeFilter);
   });
   if (currentSort!=='manual') { applyDomSort(currentSort); }
-  else { document.querySelectorAll('.item:not(.git-deleted)').forEach(function(item){ item.setAttribute('draggable','true'); }); }
   applyFilter();
 
   var grid = document.getElementById('modulesGrid');
@@ -1462,5 +1478,12 @@ window.addEventListener('keydown', function(e) {
     e.preventDefault();
     vscode.postMessage({ command: 'redo' });
   }
+});
+
+// ── window mouseup listener to clean up draggable attributes ──
+window.addEventListener('mouseup', function() {
+  document.querySelectorAll('.item, .module-card, .subsection').forEach(function(el) {
+    el.removeAttribute('draggable');
+  });
 });
 `;
