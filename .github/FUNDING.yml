@@ -1,0 +1,21 @@
+# Funding platforms for Open Items Tracker
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# GitHub Sponsors — up to 4 usernames
+github: [Gnagnom94]
+
+# Other supported platforms (single username each)
+# patreon:
+# open_collective:
+# ko_fi:
+# tidelift:
+# community_bridge:
+# liberapay:
+# issuehunt:
+# polar:
+# buy_me_a_coffee:
+# thanks_dev:
+
+# Custom sponsorship URLs — up to 4 links
+# URLs containing ":" must be quoted
+custom: ["https://www.paypal.me/MatteoAtzeni"]
