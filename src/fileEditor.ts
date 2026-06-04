@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { undoRedoManager } from './undoRedoManager';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -7,7 +8,19 @@ function readLines(filePath: string): string[] {
 }
 
 function writeLines(filePath: string, lines: string[]): void {
-  fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
+  try {
+    const oldContent = fs.readFileSync(filePath, 'utf8');
+    const newContent = lines.join('\n');
+    if (oldContent !== newContent) {
+      undoRedoManager.pushState(filePath, oldContent);
+      undoRedoManager.isInternalWrite = true;
+      fs.writeFileSync(filePath, newContent, 'utf8');
+    }
+  } finally {
+    setTimeout(() => {
+      undoRedoManager.isInternalWrite = false;
+    }, 200);
+  }
 }
 
 /** Index of next `## ` after startIdx, or lines.length */
@@ -62,6 +75,49 @@ export function toggleItemInFile(filePath: string, rawLine: string): void {
     lines[idx] = note ? `- [x] ~~**${text}**~~ — done (${today}). ${note}` : `- [x] ~~**${text}**~~ — done (${today}).`;
   }
   writeLines(filePath, lines);
+}
+
+// ── change item status ────────────────────────────────────────────────────────
+
+export function changeItemStatusInFile(
+  filePath: string,
+  rawLine: string,
+  newStatus: 'open' | 'partial' | 'future' | 'done'
+): void {
+  const lines = readLines(filePath);
+  const idx = lines.findIndex(l => l === rawLine);
+  if (idx === -1) { return; }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const isDone = rawLine.trimStart().startsWith('- [x]');
+  const { text, note } = isDone ? extractFromDone(rawLine) : extractFromOpen(rawLine);
+
+  let newLine = '';
+  if (newStatus === 'done') {
+    newLine = note ? `- [x] ~~**${text}**~~ — done (${today}). ${note}` : `- [x] ~~**${text}**~~ — done (${today}).`;
+  } else if (newStatus === 'partial') {
+    newLine = note ? `- [ ] **${text}** 🔄 — ${note}` : `- [ ] **${text}** 🔄`;
+  } else if (newStatus === 'future') {
+    newLine = note ? `- [ ] **${text}** 🔮 — ${note}` : `- [ ] **${text}** 🔮`;
+  } else {
+    newLine = note ? `- [ ] **${text}** — ${note}` : `- [ ] **${text}**`;
+  }
+
+  lines[idx] = newLine;
+  writeLines(filePath, lines);
+}
+
+// ── revert file content (undo/redo) ───────────────────────────────────────────
+
+export function revertFileContent(filePath: string, content: string): void {
+  undoRedoManager.isInternalWrite = true;
+  try {
+    fs.writeFileSync(filePath, content, 'utf8');
+  } finally {
+    setTimeout(() => {
+      undoRedoManager.isInternalWrite = false;
+    }, 200);
+  }
 }
 
 // ── edit item text ────────────────────────────────────────────────────────────

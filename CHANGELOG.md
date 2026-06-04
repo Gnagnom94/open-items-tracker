@@ -4,6 +4,16 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.0.6] - 2026-06-04
+
+### Added
+- Git status visualization with visual gutter borders and background opacity highlights.
+- Word-level inline diffing (red/green insertions/deletions) for modified tasks and descriptive notes.
+- Undo/redo capabilities via keyboard shortcuts (`Ctrl+Z`, `Ctrl+Shift+Z`, `Ctrl+Y`) and stack history.
+- Dropdown select badges for interactive status transitions (Open, Partial, Future, Done) with emoji synchronization.
+- Hybrid fuzzy item matching using Jaccard word-level similarity and Levenshtein distance to correctly pair reordered and edited tasks.
+- Precise diffing for descriptive notes, including word highlights and note deletion rendering.
+
 ## [0.0.5] - 2026-06-02
 
 ### Changed

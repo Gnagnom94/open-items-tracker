@@ -2,7 +2,7 @@
   "name": "open-items-tracker",
   "displayName": "Open Items Tracker",
   "description": "Visualize, edit, and manage your open-items.md backlog inside VS Code and Antigravity IDE. Full CRUD for modules, sub-sections, and items; drag-to-reorder; inline editing; sort strategies; and live file sync.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "Gnagnom94",
   "repository": {
     "type": "git",
@@ -115,6 +115,26 @@
           "type": "boolean",
           "default": true,
           "description": "Show future-phase items in the panel."
+        },
+        "openItemsTracker.gitIntegration": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time Git status and modifications visualization for open-items.md."
+        },
+        "openItemsTracker.gitHighlight": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight modified, added, and deleted items in the panel using Git diff status."
+        },
+        "openItemsTracker.gitShowInlineDiff": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline word-level text differences (green/red highlights) inside modified items."
+        },
+        "openItemsTracker.undoRedoStackSize": {
+          "type": "integer",
+          "default": 50,
+          "description": "Maximum number of undo steps to retain in history."
         }
       }
     }

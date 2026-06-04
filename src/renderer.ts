@@ -1,5 +1,26 @@
-import { ParsedDocument } from './parser';
+import { parseDocument, ParsedDocument, OpenItem } from './parser';
 import { ExtensionSettings } from './settings';
+
+export interface GitItemInfo {
+  text: string;
+  status: 'done' | 'open' | 'partial' | 'future';
+  note?: string;
+  date?: string;
+}
+
+export interface RenderGitState {
+  isRepo: boolean;
+  status: 'clean' | 'modified' | 'untracked' | 'error';
+  stats: {
+    added: number;
+    modified: number;
+    deleted: number;
+  };
+  itemStatus: Record<string, 'added' | 'modified' | 'clean'>;
+  itemDiffHtml: Record<string, string>;
+  itemNoteDiffHtml: Record<string, string>;
+  deletedItems: Record<string, GitItemInfo[]>;
+}
 
 export function nonce(): string {
   let t = '';
@@ -8,7 +29,380 @@ export function nonce(): string {
   return t;
 }
 
-export function getHtml(data: ParsedDocument, settings: ExtensionSettings): string {
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+export function diffTextInline(oldText: string, newText: string): string {
+  const oldWords = oldText.split(/(\s+|[.,:;()\-—–\[\]]+)/).filter(Boolean);
+  const newWords = newText.split(/(\s+|[.,:;()\-—–\[\]]+)/).filter(Boolean);
+
+  const dp: number[][] = Array(oldWords.length + 1)
+    .fill(0)
+    .map(() => Array(newWords.length + 1).fill(0));
+
+  for (let i = 1; i <= oldWords.length; i++) {
+    for (let j = 1; j <= newWords.length; j++) {
+      if (oldWords[i - 1] === newWords[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  let i = oldWords.length;
+  let j = newWords.length;
+  const result: string[] = [];
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldWords[i - 1] === newWords[j - 1]) {
+      result.unshift(escapeHtml(oldWords[i - 1]));
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.unshift(`<ins class="git-diff-ins">${escapeHtml(newWords[j - 1])}</ins>`);
+      j--;
+    } else {
+      result.unshift(`<del class="git-diff-del">${escapeHtml(oldWords[i - 1])}</del>`);
+      i--;
+    }
+  }
+
+  return result.join('');
+}
+
+export function computeGitDiff(
+  currentDoc: ParsedDocument,
+  headContent: string | undefined,
+  isRepo: boolean,
+  status: 'clean' | 'modified' | 'untracked' | 'error'
+): RenderGitState {
+  const itemStatus: Record<string, 'added' | 'modified' | 'clean'> = {};
+  const itemDiffHtml: Record<string, string> = {};
+  const itemNoteDiffHtml: Record<string, string> = {};
+  const deletedItems: Record<string, GitItemInfo[]> = {};
+  const stats = { added: 0, modified: 0, deleted: 0 };
+
+  if (!isRepo || status === 'error') {
+    return { isRepo, status, stats, itemStatus, itemDiffHtml, itemNoteDiffHtml, deletedItems };
+  }
+
+  if (status === 'untracked' || !headContent) {
+    const allCurrentItems = currentDoc.modules.flatMap(m => [
+      ...m.items,
+      ...m.subSections.flatMap(s => s.items)
+    ]);
+    for (const item of allCurrentItems) {
+      itemStatus[item.rawLine] = 'added';
+    }
+    stats.added = allCurrentItems.length;
+    return { isRepo, status, stats, itemStatus, itemDiffHtml, itemNoteDiffHtml, deletedItems };
+  }
+
+  try {
+    const headDoc = parseDocument(headContent);
+
+    for (const curMod of currentDoc.modules) {
+      const headMod = headDoc.modules.find(m => m.title === curMod.title);
+
+      // Diff module items
+      const modDiff = diffItemList(curMod.items, headMod ? headMod.items : []);
+      for (const item of modDiff.currentWithGit) {
+        itemStatus[item.rawLine] = item.gitStatus;
+        if (item.gitStatus === 'added') {
+          stats.added++;
+        } else if (item.gitStatus === 'modified') {
+          stats.modified++;
+          if (item.headText && item.headText !== item.text) {
+            itemDiffHtml[item.rawLine] = diffTextInline(item.headText, item.text);
+          }
+          if (item.headNote !== item.note) {
+            if (item.headNote && item.note) {
+              itemNoteDiffHtml[item.rawLine] = diffTextInline(item.headNote, item.note);
+            } else if (item.note) {
+              itemNoteDiffHtml[item.rawLine] = `<ins class="git-diff-ins">${escapeHtml(item.note)}</ins>`;
+            } else if (item.headNote) {
+              itemNoteDiffHtml[item.rawLine] = `<del class="git-diff-del">${escapeHtml(item.headNote)}</del>`;
+            }
+          }
+        }
+      }
+      if (modDiff.deleted.length > 0) {
+        deletedItems[curMod.rawLine] = modDiff.deleted;
+        stats.deleted += modDiff.deleted.length;
+      }
+
+      // Diff subsections
+      for (const curSub of curMod.subSections) {
+        const headSub = headMod ? headMod.subSections.find(s => s.title === curSub.title) : undefined;
+        const subDiff = diffItemList(curSub.items, headSub ? headSub.items : []);
+        for (const item of subDiff.currentWithGit) {
+          itemStatus[item.rawLine] = item.gitStatus;
+          if (item.gitStatus === 'added') {
+            stats.added++;
+          } else if (item.gitStatus === 'modified') {
+            stats.modified++;
+            if (item.headText && item.headText !== item.text) {
+              itemDiffHtml[item.rawLine] = diffTextInline(item.headText, item.text);
+            }
+            if (item.headNote !== item.note) {
+              if (item.headNote && item.note) {
+                itemNoteDiffHtml[item.rawLine] = diffTextInline(item.headNote, item.note);
+              } else if (item.note) {
+                itemNoteDiffHtml[item.rawLine] = `<ins class="git-diff-ins">${escapeHtml(item.note)}</ins>`;
+              } else if (item.headNote) {
+                itemNoteDiffHtml[item.rawLine] = `<del class="git-diff-del">${escapeHtml(item.headNote)}</del>`;
+              }
+            }
+          }
+        }
+        if (subDiff.deleted.length > 0) {
+          deletedItems[curSub.rawLine] = subDiff.deleted;
+          stats.deleted += subDiff.deleted.length;
+        }
+      }
+    }
+  } catch {
+    // Fail-safe: if parsing HEAD fails, fall back to empty diff
+  }
+
+  return { isRepo, status, stats, itemStatus, itemDiffHtml, itemNoteDiffHtml, deletedItems };
+}
+
+function getLISIndices(arr: number[]): Set<number> {
+  const n = arr.length;
+  if (n === 0) { return new Set(); }
+
+  const parent = Array(n).fill(-1);
+  const lengths = Array(n).fill(1);
+
+  for (let i = 1; i < n; i++) {
+    for (let j = 0; j < i; j++) {
+      if (arr[i] > arr[j] && lengths[j] + 1 > lengths[i]) {
+        lengths[i] = lengths[j] + 1;
+        parent[i] = j;
+      }
+    }
+  }
+
+  let maxLength = 0;
+  let maxIdx = -1;
+  for (let i = 0; i < n; i++) {
+    if (lengths[i] > maxLength) {
+      maxLength = lengths[i];
+      maxIdx = i;
+    }
+  }
+
+  const lisIndices = new Set<number>();
+  let curr = maxIdx;
+  while (curr !== -1) {
+    lisIndices.add(curr);
+    curr = parent[curr];
+  }
+
+  return lisIndices;
+}
+
+function levenshteinDistance(s1: string, s2: string): number {
+  const len1 = s1.length;
+  const len2 = s2.length;
+  if (len1 === 0) { return len2; }
+  if (len2 === 0) { return len1; }
+
+  let prevRow = Array(len2 + 1);
+  let currRow = Array(len2 + 1);
+
+  for (let j = 0; j <= len2; j++) {
+    prevRow[j] = j;
+  }
+
+  for (let i = 1; i <= len1; i++) {
+    currRow[0] = i;
+    for (let j = 1; j <= len2; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      currRow[j] = Math.min(
+        currRow[j - 1] + 1, // Insertion
+        prevRow[j] + 1,     // Deletion
+        prevRow[j - 1] + cost // Substitution
+      );
+    }
+    const temp = prevRow;
+    prevRow = currRow;
+    currRow = temp;
+  }
+
+  return prevRow[len2];
+}
+
+function stringSimilarity(s1: string, s2: string): number {
+  const clean1 = s1.toLowerCase().trim();
+  const clean2 = s2.toLowerCase().trim();
+  const d = levenshteinDistance(clean1, clean2);
+  const maxLen = Math.max(clean1.length, clean2.length);
+  if (maxLen === 0) { return 1.0; }
+  return 1.0 - d / maxLen;
+}
+
+function jaccardSimilarity(s1: string, s2: string): number {
+  const words1 = s1.toLowerCase().split(/[^a-z0-9]+/i).filter(Boolean);
+  const words2 = s2.toLowerCase().split(/[^a-z0-9]+/i).filter(Boolean);
+  if (words1.length === 0 || words2.length === 0) { return 0; }
+
+  const set1 = new Set(words1);
+  const set2 = new Set(words2);
+
+  let intersection = 0;
+  for (const w of set1) {
+    if (set2.has(w)) {
+      intersection++;
+    }
+  }
+
+  const union = set1.size + set2.size - intersection;
+  return intersection / union;
+}
+
+function diffItemList(currentItems: OpenItem[], headItems: OpenItem[]): {
+  currentWithGit: (OpenItem & { gitStatus: 'added' | 'modified' | 'clean'; headText?: string; headNote?: string })[];
+  deleted: GitItemInfo[];
+} {
+  const currentWithGit: (OpenItem & { gitStatus: 'added' | 'modified' | 'clean'; headText?: string; headNote?: string; headIdx?: number })[] = currentItems.map(item => ({
+    ...item,
+    gitStatus: 'added' as const,
+    headText: undefined as string | undefined,
+    headNote: undefined as string | undefined,
+    headIdx: undefined as number | undefined
+  }));
+  const deleted: GitItemInfo[] = [];
+  const matchedHeadIndices = new Set<number>();
+
+  // 1. Match by ID
+  for (let i = 0; i < currentWithGit.length; i++) {
+    const cur = currentWithGit[i];
+    const curId = extractId(cur.text);
+    if (!curId) { continue; }
+
+    for (let j = 0; j < headItems.length; j++) {
+      if (matchedHeadIndices.has(j)) { continue; }
+      const head = headItems[j];
+      const headId = extractId(head.text);
+      if (headId === curId) {
+        matchedHeadIndices.add(j);
+        currentWithGit[i].gitStatus = itemIdentical(cur, head) ? 'clean' : 'modified';
+        currentWithGit[i].headText = head.text;
+        currentWithGit[i].headNote = head.note;
+        currentWithGit[i].headIdx = j;
+        break;
+      }
+    }
+  }
+
+  // 2. Match by exact text
+  for (let i = 0; i < currentWithGit.length; i++) {
+    if (currentWithGit[i].gitStatus !== 'added') { continue; }
+    const cur = currentWithGit[i];
+
+    for (let j = 0; j < headItems.length; j++) {
+      if (matchedHeadIndices.has(j)) { continue; }
+      const head = headItems[j];
+      if (cur.text.trim() === head.text.trim()) {
+        matchedHeadIndices.add(j);
+        currentWithGit[i].gitStatus = itemIdentical(cur, head) ? 'clean' : 'modified';
+        currentWithGit[i].headText = head.text;
+        currentWithGit[i].headNote = head.note;
+        currentWithGit[i].headIdx = j;
+        break;
+      }
+    }
+  }
+
+  // 2.5. Match by fuzzy similarity
+  for (let i = 0; i < currentWithGit.length; i++) {
+    if (currentWithGit[i].gitStatus !== 'added') { continue; }
+    const cur = currentWithGit[i];
+    const curId = extractId(cur.text);
+    if (curId) { continue; }
+
+    let bestHeadIdx = -1;
+    let bestSimilarity = -1;
+
+    for (let j = 0; j < headItems.length; j++) {
+      if (matchedHeadIndices.has(j)) { continue; }
+      const head = headItems[j];
+      const headId = extractId(head.text);
+      if (headId) { continue; }
+
+      const levSim = stringSimilarity(cur.text, head.text);
+      const jacSim = jaccardSimilarity(cur.text, head.text);
+      const isSimilar = levSim >= 0.55 || jacSim >= 0.45;
+      const score = Math.max(levSim, jacSim);
+
+      if (isSimilar && score > bestSimilarity) {
+        bestSimilarity = score;
+        bestHeadIdx = j;
+      }
+    }
+
+    if (bestHeadIdx !== -1) {
+      matchedHeadIndices.add(bestHeadIdx);
+      const head = headItems[bestHeadIdx];
+      currentWithGit[i].gitStatus = itemIdentical(cur, head) ? 'clean' : 'modified';
+      currentWithGit[i].headText = head.text;
+      currentWithGit[i].headNote = head.note;
+      currentWithGit[i].headIdx = bestHeadIdx;
+    }
+  }
+
+
+
+  // Find reordered items using LIS on matched indices
+  const matchedPairs = currentWithGit
+    .map((item, index) => ({ currentIdx: index, headIdx: item.headIdx }))
+    .filter((pair): pair is { currentIdx: number; headIdx: number } => pair.headIdx !== undefined);
+
+  const headIndices = matchedPairs.map(p => p.headIdx);
+  const lisIndices = getLISIndices(headIndices);
+
+  for (let k = 0; k < matchedPairs.length; k++) {
+    if (!lisIndices.has(k)) {
+      const curIdx = matchedPairs[k].currentIdx;
+      currentWithGit[curIdx].gitStatus = 'modified';
+    }
+  }
+
+  // 4. Any remaining head items are deleted
+  for (let j = 0; j < headItems.length; j++) {
+    if (!matchedHeadIndices.has(j)) {
+      const h = headItems[j];
+      deleted.push({ text: h.text, status: h.status, note: h.note, date: h.date });
+    }
+  }
+
+  return { currentWithGit, deleted };
+}
+
+function extractId(text: string): string | undefined {
+  const m1 = text.match(/^([A-Z0-9_-]+-\d+)/i);
+  if (m1) { return m1[1].toLowerCase(); }
+  return undefined;
+}
+
+function itemIdentical(a: OpenItem, b: OpenItem): boolean {
+  return a.text === b.text && a.status === b.status && a.note === b.note;
+}
+
+export function getHtml(
+  data: ParsedDocument,
+  settings: ExtensionSettings,
+  historyState: { hasUndo: boolean; hasRedo: boolean },
+  gitState: RenderGitState
+): string {
   const n = nonce();
   return `<!DOCTYPE html>
 <html lang="en">
@@ -26,7 +420,7 @@ export function getHtml(data: ParsedDocument, settings: ExtensionSettings): stri
   <script nonce="${n}">
     var vscode = acquireVsCodeApi();
     ${WEBVIEW_SCRIPT}
-    renderApp(${JSON.stringify(data)}, ${JSON.stringify(settings)});
+    renderApp(${JSON.stringify(data)}, ${JSON.stringify(settings)}, ${JSON.stringify(historyState)}, ${JSON.stringify(gitState)});
     initDragDrop();
   </script>
 </body>
@@ -209,12 +603,131 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
 .btn-secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .btn-icon { padding: 3px 7px; background: transparent; color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-panel-border); border-radius: 3px; cursor: pointer; font-size: 0.82em; font-family: var(--vscode-font-family); line-height: 1.4; }
 .btn-icon:hover { background: var(--vscode-list-hoverBackground); color: var(--vscode-foreground); }
+.btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
 .btn-icon-danger:hover { background: color-mix(in srgb, var(--vscode-errorForeground, #f48771) 12%, transparent); color: var(--vscode-errorForeground, #f48771); border-color: var(--vscode-errorForeground, #f48771); }
 
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center; color: var(--vscode-descriptionForeground); gap: 10px; }
 .empty-icon { font-size: 3em; }
 .empty-state h2 { font-size: 1.1em; color: var(--vscode-foreground); }
 .empty-state p { font-size: 0.9em; line-height: 1.6; }
+
+/* ── Git gutter & background highlights ─────────────────────────────────────── */
+.item.git-added {
+  border-left: 3px solid var(--vscode-gitDecoration-addedResourceForeground, #81b88b) !important;
+  background-color: color-mix(in srgb, var(--vscode-gitDecoration-addedResourceForeground, #81b88b) 8%, transparent);
+}
+.item.git-modified {
+  border-left: 3px solid var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d) !important;
+  background-color: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d) 8%, transparent);
+}
+.item.git-deleted {
+  opacity: 0.7;
+  padding-left: 12px;
+  background-color: color-mix(in srgb, var(--vscode-errorForeground, #f48771) 4%, transparent);
+}
+.git-deleted-indicator {
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--vscode-errorForeground, #f48771);
+  font-weight: bold;
+}
+
+/* ── Inline diffing ────────────────────────────────────────────────────────── */
+.git-diff-ins {
+  background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(155, 185, 85, 0.2));
+  text-decoration: none;
+  border-bottom: 1px dashed var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+.git-diff-del {
+  background-color: var(--vscode-diffEditor-removedTextBackground, rgba(255, 0, 0, 0.15));
+  text-decoration: line-through;
+  opacity: 0.6;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* ── Git Status Panel ──────────────────────────────────────────────────────── */
+.git-status-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  margin-bottom: 12px;
+  font-size: 0.82em;
+  border-radius: 4px;
+  border: 1px solid var(--vscode-panel-border);
+}
+.git-status-panel.git-clean {
+  background-color: color-mix(in srgb, var(--vscode-testing-iconPassed, #4caf50) 4%, transparent);
+}
+.git-status-panel.git-dirty {
+  background-color: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 4%, transparent);
+}
+.git-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.git-status-text {
+  font-weight: 600;
+}
+.git-stats-badges {
+  display: flex;
+  gap: 4px;
+}
+.git-badge {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 700;
+}
+.git-badge-add {
+  background-color: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
+  color: var(--vscode-editor-background);
+}
+.git-badge-mod {
+  background-color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+  color: var(--vscode-editor-background);
+}
+.git-badge-del {
+  background-color: var(--vscode-errorForeground, #f48771);
+  color: var(--vscode-editor-background);
+}
+
+/* ── Interactive Status Select Badge ─────────────────────────────────────────── */
+.item-status-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 0.72em;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  text-align: center;
+  flex-shrink: 0;
+  margin-top: 4px;
+  margin-right: 4px;
+}
+.item-status-select.status-open {
+  background-color: var(--vscode-badge-background, #5a5a5a);
+  color: var(--vscode-badge-foreground, #ffffff);
+}
+.item-status-select.status-partial {
+  background-color: var(--vscode-charts-orange, #d18616);
+  color: #ffffff;
+}
+.item-status-select.status-future {
+  background-color: var(--vscode-charts-purple, #b267e6);
+  color: #ffffff;
+}
+.item-status-select.status-done {
+  background-color: var(--vscode-testing-iconPassed, #4caf50);
+  color: #ffffff;
+}
 `;
 
 // ── Shared file-drop script ───────────────────────────────────────────────────
@@ -246,6 +759,8 @@ var activeFilter = 'all';
 var searchQuery = '';
 var currentSort = 'manual';
 var currentSettings = null;
+var currentHistoryState = null;
+var currentGitState = null;
 var isItemDrag = false;
 var isModuleDrag = false;
 var isSubDrag = false;
@@ -272,7 +787,7 @@ function sortedItems(items, strategy) {
 }
 function applyDomSort(strategy) {
   document.querySelectorAll('.items-list').forEach(function(list) {
-    var items = Array.from(list.querySelectorAll(':scope > .item'));
+    var items = Array.from(list.querySelectorAll(':scope > .item:not(.git-deleted)'));
     if (items.length <= 1) { return; }
     var sorted;
     if (strategy === 'manual') {
@@ -290,9 +805,12 @@ function applyDomSort(strategy) {
         return 0;
       });
     }
+    // Reinsert in sorted order, keeping git-deleted items at the end
+    var deletedItems = Array.from(list.querySelectorAll(':scope > .item.git-deleted'));
     sorted.forEach(function(item){ list.appendChild(item); });
+    deletedItems.forEach(function(item){ list.appendChild(item); });
   });
-  document.querySelectorAll('.item').forEach(function(item){
+  document.querySelectorAll('.item:not(.git-deleted)').forEach(function(item){
     if (strategy==='manual') { item.setAttribute('draggable','true'); }
     else { item.removeAttribute('draggable'); }
   });
@@ -303,6 +821,10 @@ function applyFilter() {
   var filter = activeFilter, query = searchQuery.toLowerCase();
   document.querySelectorAll('.item').forEach(function(item) {
     var status = item.getAttribute('data-status')||'';
+    if (item.classList.contains('git-deleted')) {
+      item.style.display = (filter==='all'||filter==='open') && (!query||item.textContent.toLowerCase().indexOf(query)>=0) ? '' : 'none';
+      return;
+    }
     if (status==='done'   && currentSettings && !currentSettings.showDoneItems)   { item.style.display='none'; return; }
     if (status==='future' && currentSettings && !currentSettings.showFutureItems) { item.style.display='none'; return; }
     var text = item.textContent.toLowerCase();
@@ -310,7 +832,6 @@ function applyFilter() {
   });
   document.querySelectorAll('.module-card').forEach(function(card) {
     var items = Array.from(card.querySelectorAll('.item'));
-    // empty module always visible; non-empty module visible if at least one item passes filter
     var visible = items.length === 0 || items.some(function(i){ return i.style.display!=='none'; });
     card.style.display = visible ? '' : 'none';
   });
@@ -318,23 +839,41 @@ function applyFilter() {
 
 // ── render item ──
 function renderItem(item, origIdx) {
+  var gitStatus = (currentGitState && currentGitState.itemStatus[item.rawLine]) || 'clean';
+  var gitClass = gitStatus !== 'clean' && currentSettings && currentSettings.gitHighlight ? ' git-' + gitStatus : '';
+  
   var checked = item.status==='done' ? ' checked' : '';
   var textClass = item.status==='done' ? 'item-text done' : 'item-text';
-  var badge = item.status==='partial' ? '<span class="item-badge">&#128260;</span>'
-            : item.status==='future'  ? '<span class="item-badge">&#128302;</span>' : '';
-  var dateHtml = item.date ? '<span class="item-date">'+esc(item.date)+'</span>' : '';
-  var noteHtml = item.note
-    ? '<div class="item-note" data-raw="'+encodeURIComponent(item.rawLine||'')+'" title="Double-click to edit">'+esc(item.note)+'</div>'
-    : '';
   var rawKey = encodeURIComponent(item.rawLine||'');
+
+  var statusSelect = 
+    '<select class="item-status-select status-' + item.status + '" data-raw="' + rawKey + '">' +
+      '<option value="open"' + (item.status==='open'?' selected':'') + '>Open</option>' +
+      '<option value="partial"' + (item.status==='partial'?' selected':'') + '>🔄 Partial</option>' +
+      '<option value="future"' + (item.status==='future'?' selected':'') + '>🔮 Future</option>' +
+      '<option value="done"' + (item.status==='done'?' selected':'') + '>✅ Done</option>' +
+    '</select>';
+
+  var dateHtml = item.date ? '<span class="item-date">'+esc(item.date)+'</span>' : '';
+  var noteDiff = (currentSettings && currentSettings.gitHighlight && currentSettings.gitShowInlineDiff && currentGitState && currentGitState.itemNoteDiffHtml[item.rawLine]);
+  var noteHtml = '';
+  if (noteDiff) {
+    noteHtml = '<div class="item-note" data-raw="'+rawKey+'" title="Double-click to edit">'+noteDiff+'</div>';
+  } else if (item.note) {
+    noteHtml = '<div class="item-note" data-raw="'+rawKey+'" title="Double-click to edit">'+esc(item.note)+'</div>';
+  }
+  
+  var textHtml = (currentSettings && currentSettings.gitHighlight && currentSettings.gitShowInlineDiff && currentGitState && currentGitState.itemDiffHtml[item.rawLine]) || esc(item.text);
+
   return (
-    '<li class="item" draggable="true" data-status="'+item.status+'" data-raw="'+rawKey+'" data-text="'+esc(item.text)+'" data-orig-idx="'+origIdx+'">' +
+    '<li class="item' + gitClass + '" draggable="true" data-status="'+item.status+'" data-raw="'+rawKey+'" data-text="'+esc(item.text)+'" data-orig-idx="'+origIdx+'">' +
       '<span class="drag-handle" title="Drag to reorder">&#8942;</span>' +
       '<input type="checkbox" class="item-checkbox"'+checked+'>' +
+      statusSelect +
       '<div class="item-body">' +
         '<div class="'+textClass+'">' +
-          '<span class="item-text-content" title="Double-click to edit">'+esc(item.text)+'</span>' +
-          badge + dateHtml +
+          '<span class="item-text-content" title="Double-click to edit">'+textHtml+'</span>' +
+          dateHtml +
         '</div>' +
         noteHtml +
       '</div>' +
@@ -345,9 +884,30 @@ function renderItem(item, origIdx) {
 
 function renderItems(items, parentRaw) {
   var sorted = sortedItems(items, currentSort);
-  var html = sorted.length > 0
-    ? '<ul class="items-list">'+sorted.map(function(item,i){ return renderItem(item,i); }).join('')+'</ul>'
-    : '';
+  var html = '<ul class="items-list">';
+  if (sorted.length > 0) {
+    html += sorted.map(function(item,i){ return renderItem(item,i); }).join('');
+  }
+
+  // Render deleted items (Git diff)
+  if (currentSettings && currentSettings.gitHighlight && currentGitState && currentGitState.deletedItems && currentGitState.deletedItems[parentRaw]) {
+    var deletedList = currentGitState.deletedItems[parentRaw];
+    html += deletedList.map(function(delItem) {
+      return (
+        '<li class="item git-deleted" data-status="deleted">' +
+          '<span class="git-deleted-indicator" title="Deleted in Git">&#10005;</span>' +
+          '<div class="item-body">' +
+            '<div class="item-text done" style="color: var(--vscode-errorForeground, #f48771);">' +
+              '<del class="git-diff-del">' + esc(delItem.text) + '</del>' +
+              (delItem.note ? '<div class="item-note"><del class="git-diff-del">' + esc(delItem.note) + '</del></div>' : '') +
+            '</div>' +
+          '</div>' +
+        '</li>'
+      );
+    }).join('');
+  }
+
+  html += '</ul>';
   html += '<button class="btn-add btn-add-item" data-parent-raw="'+encodeURIComponent(parentRaw)+'">+ Add item</button>';
   return html;
 }
@@ -453,6 +1013,7 @@ function initInlineEdit(root) {
     var tc = e.target.closest('.item-text-content');
     if (tc) {
       var item = tc.closest('.item');
+      if (item.classList.contains('git-deleted')) { return; }
       var rawLine = decodeURIComponent(item.getAttribute('data-raw')||'');
       var origText = item.getAttribute('data-text') || tc.textContent.trim();
       startInlineEdit(tc, origText, function(t){ item.setAttribute('data-text',t); vscode.postMessage({command:'editItem',rawLine:rawLine,newText:t}); });
@@ -472,6 +1033,8 @@ function initInlineEdit(root) {
     }
     var ne = e.target.closest('.item-note');
     if (ne) {
+      var item2 = ne.closest('.item');
+      if (item2 && item2.classList.contains('git-deleted')) { return; }
       var raw3 = decodeURIComponent(ne.getAttribute('data-raw')||'');
       startInlineEdit(ne, ne.textContent.trim(), function(t){ vscode.postMessage({command:'editItemNote',rawLine:raw3,newNote:t}); });
       return;
@@ -493,7 +1056,7 @@ function initItemReorder(root) {
   });
   root.addEventListener('dragstart', function(e){
     var item = e.target.closest('.item[draggable="true"]');
-    if (!item) { return; }
+    if (!item || item.classList.contains('git-deleted')) { return; }
     if (isModuleDrag || isSubDrag) { return; }
     isItemDrag=true; dragging=item; e.dataTransfer.effectAllowed='move';
     setTimeout(function(){ item.classList.add('dragging'); },0);
@@ -517,9 +1080,9 @@ function initItemReorder(root) {
     if (!dragging||!dragOverEl) { dragging=null; dragOverEl=null; return; }
     var list=dragging.closest('.items-list'), tlist=dragOverEl.closest('.items-list');
     if (!list||list!==tlist) { dragging=null; dragOverEl=null; return; }
-    var oldOrder=Array.from(list.querySelectorAll(':scope > .item')).map(function(i){ return decodeURIComponent(i.getAttribute('data-raw')||''); });
+    var oldOrder=Array.from(list.querySelectorAll(':scope > .item:not(.git-deleted)')).map(function(i){ return decodeURIComponent(i.getAttribute('data-raw')||''); });
     if (insertBefore) { list.insertBefore(dragging,dragOverEl); } else { list.insertBefore(dragging,dragOverEl.nextSibling); }
-    var newOrder=Array.from(list.querySelectorAll(':scope > .item')).map(function(i){ return decodeURIComponent(i.getAttribute('data-raw')||''); });
+    var newOrder=Array.from(list.querySelectorAll(':scope > .item:not(.git-deleted)')).map(function(i){ return decodeURIComponent(i.getAttribute('data-raw')||''); });
     vscode.postMessage({command:'reorderItems',oldOrder:oldOrder,newOrder:newOrder});
     dragging=null; dragOverEl=null;
   });
@@ -643,8 +1206,11 @@ function initDragDrop() {
 }
 
 // ── main render ──
-function renderApp(data, settings) {
+function renderApp(data, settings, historyState, gitState) {
   currentSettings = settings;
+  currentHistoryState = historyState;
+  currentGitState = gitState;
+
   var state = vscode.getState()||{};
   currentSort = state.currentSort || settings.defaultSort;
   activeFilter = state.activeFilter || 'all';
@@ -659,6 +1225,13 @@ function renderApp(data, settings) {
   html += '<button class="btn-icon" id="useActiveBtn" title="Use active editor file">&#128196;</button>';
   html += '<button class="btn-icon" id="changeFileBtn" title="Choose file">&#128194;</button>';
   html += '<button class="btn-icon btn-icon-danger" id="clearFileBtn" title="Clear">&#10005;</button>';
+  
+  // Undo/Redo buttons
+  var undoDisabled = !currentHistoryState || !currentHistoryState.hasUndo ? ' disabled' : '';
+  var redoDisabled = !currentHistoryState || !currentHistoryState.hasRedo ? ' disabled' : '';
+  html += '<button class="btn-icon" id="undoBtn" title="Undo (Ctrl+Z)"' + undoDisabled + '>&#8630;</button>';
+  html += '<button class="btn-icon" id="redoBtn" title="Redo (Ctrl+Shift+Z)"' + redoDisabled + '>&#8631;</button>';
+
   if (data.filePath) { html += '<button class="btn-secondary" id="openFileBtn">Open File &#8599;</button>'; }
   html += '</div></div>';
   if (data.lastUpdated) { html += '<div class="last-updated">Last updated: '+esc(data.lastUpdated)+'</div>'; }
@@ -674,6 +1247,36 @@ function renderApp(data, settings) {
   html += '<div class="stat"><span class="stat-count pct-color">'+pct+'%</span><span class="stat-label">Complete</span></div>';
   html += '</div>';
   html += '<div class="progress-wrap"><div class="progress-bar" style="width:'+pct+'%"></div></div>';
+
+  // Git Status Panel
+  if (settings.gitIntegration && currentGitState && currentGitState.isRepo && currentGitState.status !== 'error') {
+    var gitClass = currentGitState.status === 'clean' ? 'git-clean' : 'git-dirty';
+    var gitText = currentGitState.status === 'clean' ? 'Git: Clean' : 'Git: Modified';
+    var gitStats = '';
+    if (currentGitState.stats.added > 0 || currentGitState.stats.modified > 0 || currentGitState.stats.deleted > 0) {
+      gitStats += '<span class="git-stats-badges">';
+      if (currentGitState.stats.added > 0) {
+        gitStats += '<span class="git-badge git-badge-add">+' + currentGitState.stats.added + '</span>';
+      }
+      if (currentGitState.stats.modified > 0) {
+        gitStats += '<span class="git-badge git-badge-mod">~' + currentGitState.stats.modified + '</span>';
+      }
+      if (currentGitState.stats.deleted > 0) {
+        gitStats += '<span class="git-badge git-badge-del">-' + currentGitState.stats.deleted + '</span>';
+      }
+      gitStats += '</span>';
+    }
+
+    html += (
+      '<div class="git-status-panel ' + gitClass + '">' +
+        '<div class="git-info">' +
+          '<span class="git-icon">&#9670; git</span>' +
+          '<span class="git-status-text">' + gitText + '</span>' +
+          gitStats +
+        '</div>' +
+      '</div>'
+    );
+  }
 
   // controls
   html += '<div class="controls"><div class="controls-top">';
@@ -704,7 +1307,7 @@ function renderApp(data, settings) {
     btn.classList.toggle('active', btn.getAttribute('data-filter')===activeFilter);
   });
   if (currentSort!=='manual') { applyDomSort(currentSort); }
-  else { document.querySelectorAll('.item').forEach(function(item){ item.setAttribute('draggable','true'); }); }
+  else { document.querySelectorAll('.item:not(.git-deleted)').forEach(function(item){ item.setAttribute('draggable','true'); }); }
   applyFilter();
 
   var grid = document.getElementById('modulesGrid');
@@ -730,6 +1333,17 @@ function renderApp(data, settings) {
     item.setAttribute('data-status', target.checked?'done':'open');
     if (activeFilter!=='all') { applyFilter(); }
     vscode.postMessage({command:'toggleItem', rawLine:decodeURIComponent(item.getAttribute('data-raw')||'')});
+  });
+
+  // status select
+  grid.addEventListener('change', function(e){
+    var target = e.target;
+    if (target.tagName==='SELECT' && target.classList.contains('item-status-select')) {
+      var item = target.closest('.item'); if (!item) { return; }
+      var rawLine = decodeURIComponent(target.getAttribute('data-raw')||'');
+      var newStatus = target.value;
+      vscode.postMessage({command:'changeStatus', rawLine:rawLine, newStatus:newStatus});
+    }
   });
 
   // delete buttons (delegation on grid + module-wrap)
@@ -802,6 +1416,12 @@ function renderApp(data, settings) {
   var openBtn = document.getElementById('openFileBtn');
   if (openBtn) { openBtn.addEventListener('click', function(){ vscode.postMessage({command:'openFile'}); }); }
 
+  // Undo/Redo buttons
+  var undoBtn = document.getElementById('undoBtn');
+  if (undoBtn) { undoBtn.addEventListener('click', function(){ vscode.postMessage({command:'undo'}); }); }
+  var redoBtn = document.getElementById('redoBtn');
+  if (redoBtn) { redoBtn.addEventListener('click', function(){ vscode.postMessage({command:'redo'}); }); }
+
   // search
   var searchInput = document.getElementById('searchInput');
   if (searchInput) {
@@ -822,4 +1442,25 @@ function renderApp(data, settings) {
     sortSelect.addEventListener('change', function(){ currentSort=sortSelect.value; saveState(); applyDomSort(currentSort); applyFilter(); });
   }
 }
+
+// ── window keydown listener (Undo/Redo) ──
+window.addEventListener('keydown', function(e) {
+  var target = e.target;
+  var isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+  if (isInput) { return; }
+
+  var isUndo = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey;
+  var isRedo = (e.ctrlKey || e.metaKey) && (
+    (e.key.toLowerCase() === 'z' && e.shiftKey) || 
+    e.key.toLowerCase() === 'y'
+  );
+
+  if (isUndo) {
+    e.preventDefault();
+    vscode.postMessage({ command: 'undo' });
+  } else if (isRedo) {
+    e.preventDefault();
+    vscode.postMessage({ command: 'redo' });
+  }
+});
 `;

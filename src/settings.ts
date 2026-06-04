@@ -7,6 +7,10 @@ export interface ExtensionSettings {
   collapseByDefault: boolean;
   showDoneItems: boolean;
   showFutureItems: boolean;
+  gitIntegration: boolean;
+  gitHighlight: boolean;
+  gitShowInlineDiff: boolean;
+  undoRedoStackSize: number;
 }
 
 export function readSettings(): ExtensionSettings {
@@ -16,5 +20,9 @@ export function readSettings(): ExtensionSettings {
     collapseByDefault: c.get<boolean>('collapseByDefault', false),
     showDoneItems: c.get<boolean>('showDoneItems', true),
     showFutureItems: c.get<boolean>('showFutureItems', true),
+    gitIntegration: c.get<boolean>('gitIntegration', true),
+    gitHighlight: c.get<boolean>('gitHighlight', true),
+    gitShowInlineDiff: c.get<boolean>('gitShowInlineDiff', true),
+    undoRedoStackSize: c.get<number>('undoRedoStackSize', 50),
   };
 }
