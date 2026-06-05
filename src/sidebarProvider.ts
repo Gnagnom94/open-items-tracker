@@ -33,6 +33,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async msg => {
       const fp = this._resolveFile();
       switch (msg.command) {
+        case 'skillStatus': vscode.commands.executeCommand('openItemsTracker.skillStatus'); break;
         case 'openFile':
           if (fp) { vscode.workspace.openTextDocument(fp).then(d => vscode.window.showTextDocument(d)); } break;
         case 'pickFile':   await this._pickFile(); break;

@@ -445,6 +445,7 @@ export function getNoFileHtml(): string {
     <div class="empty-actions">
       <button class="btn-primary" id="useActiveBtn">Use Active Editor</button>
       <button class="btn-secondary" id="pickFileBtn">Choose File&hellip;</button>
+      <button class="btn-secondary" id="skillStatusBtn">&#x1F9E9; AI Skill</button>
     </div>
   </div>
   <script nonce="${n}">
@@ -453,6 +454,7 @@ export function getNoFileHtml(): string {
     initDropZone(document.getElementById('dropZone'));
     document.getElementById('useActiveBtn').addEventListener('click', function() { vscode.postMessage({ command: 'useActiveFile' }); });
     document.getElementById('pickFileBtn').addEventListener('click', function() { vscode.postMessage({ command: 'pickFile' }); });
+    document.getElementById('skillStatusBtn').addEventListener('click', function() { vscode.postMessage({ command: 'skillStatus' }); });
   </script>
 </body>
 </html>`;
@@ -1253,6 +1255,7 @@ function renderApp(data, settings, historyState, gitState) {
 
   // header
   html += '<div class="header"><div class="header-row"><h1>Open Items</h1><div class="header-actions">';
+  html += '<button class="btn-icon" id="skillStatusBtn" title="AI Skill Status &amp; Install">&#x1F9E9;</button>';
   html += '<button class="btn-icon" id="useActiveBtn" title="Use active editor file">&#128196;</button>';
   html += '<button class="btn-icon" id="changeFileBtn" title="Choose file">&#128194;</button>';
   html += '<button class="btn-icon btn-icon-danger" id="clearFileBtn" title="Clear">&#10005;</button>';
@@ -1437,6 +1440,8 @@ function renderApp(data, settings, historyState, gitState) {
   });
 
   // header buttons
+  var skillStatusBtn = document.getElementById('skillStatusBtn');
+  if (skillStatusBtn) { skillStatusBtn.addEventListener('click', function(){ vscode.postMessage({command:'skillStatus'}); }); }
   var useActiveBtn = document.getElementById('useActiveBtn');
   if (useActiveBtn) { useActiveBtn.addEventListener('click', function(){ vscode.postMessage({command:'useActiveFile'}); }); }
   var changeBtn = document.getElementById('changeFileBtn');

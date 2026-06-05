@@ -1,8 +1,8 @@
 {
   "name": "open-items-tracker",
   "displayName": "Open Items Tracker",
-  "description": "Visualize, edit, and manage your open-items.md backlog inside VS Code and Antigravity IDE. Full CRUD for modules, sub-sections, and items; drag-to-reorder; inline editing; sort strategies; and live file sync.",
-  "version": "0.0.8",
+  "description": "Visualize, edit, and manage your open-items.md backlog inside VS Code, Cursor, Windsurf, and Antigravity IDE. Full CRUD for modules, sub-sections, and items; drag-to-reorder; inline editing; sort strategies; live file sync; and AI skill auto-install.",
+  "version": "0.1.0",
   "publisher": "Gnagnom94",
   "repository": {
     "type": "git",
@@ -62,6 +62,11 @@
         "command": "openItemsTracker.showPanel",
         "title": "Open Items Tracker: Show Panel",
         "icon": "$(checklist)"
+      },
+      {
+        "command": "openItemsTracker.skillStatus",
+        "title": "Open Items Tracker: AI Skill Status & Install",
+        "icon": "$(extensions)"
       }
     ],
     "menus": {
@@ -78,6 +83,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "openItemsTracker.skillStatus",
+          "when": "view == openItemsTracker.sidebar",
+          "group": "navigation"
+        },
         {
           "command": "openItemsTracker.showPanel",
           "when": "view == openItemsTracker.sidebar",
@@ -135,6 +145,21 @@
           "type": "integer",
           "default": 50,
           "description": "Maximum number of undo steps to retain in history."
+        },
+        "openItemsTracker.promptSkillInstall": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a one-time prompt to install the Open Items Tracker AI skill into your AI coding assistant (Claude Code or Antigravity IDE) when the extension activates."
+        },
+        "openItemsTracker.skillPathClaudeCode": {
+          "type": "string",
+          "default": "",
+          "description": "Override the target directory for the AI skill when running in VS Code (Claude Code). Leave empty to use the default: ~/.claude/skills/open-items-tracker/"
+        },
+        "openItemsTracker.skillPathAntigravity": {
+          "type": "string",
+          "default": "",
+          "description": "Override the target directory for the AI skill when running in Antigravity IDE. Leave empty to use the default: ~/.gemini/config/skills/open-items-tracker/"
         }
       }
     }
