@@ -474,62 +474,114 @@ export function getErrorHtml(): string {
 
 const STYLES = `
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 16px 20px; }
+body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 0 20px 20px 20px; }
 code { font-family: var(--vscode-editor-font-family, monospace); background: var(--vscode-textCodeBlock-background); padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
 
 .drop-overlay { position: fixed; inset: 0; z-index: 200; background: color-mix(in srgb, var(--vscode-editor-background) 85%, transparent); border: 2px dashed var(--vscode-focusBorder); display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .drop-overlay.hidden { display: none; }
 .drop-message { font-size: 1.1em; font-weight: 600; color: var(--vscode-focusBorder); padding: 16px 24px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-focusBorder); border-radius: 8px; }
 
-.drop-zone { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; text-align: center; gap: 12px; border: 2px dashed var(--vscode-panel-border); border-radius: 8px; padding: 32px; transition: border-color 0.15s, background 0.15s; }
+.drop-zone { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; text-align: center; gap: 12px; border: 2px dashed var(--vscode-panel-border); border-radius: 8px; padding: 32px; transition: border-color 0.15s, background 0.15s; margin-top: 16px; }
 .drop-zone.dragover { border-color: var(--vscode-focusBorder); background: color-mix(in srgb, var(--vscode-focusBorder) 8%, transparent); }
 .drop-zone .empty-icon { font-size: 3em; }
 .drop-zone h2 { font-size: 1.1em; color: var(--vscode-foreground); }
 .drop-zone p { font-size: 0.88em; color: var(--vscode-descriptionForeground); }
 .empty-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 
-.header { margin-bottom: 16px; }
+/* Sticky Topbar Container */
+.topbar {
+  position: sticky;
+  top: 0;
+  background: var(--vscode-editor-background);
+  z-index: 100;
+  padding-top: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid transparent;
+  margin-bottom: 16px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+.topbar.is-sticky {
+  background: color-mix(in srgb, var(--vscode-editor-background) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.header { margin-bottom: 12px; }
 .header-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
 .header-row h1 { font-size: 1.3em; font-weight: 600; }
 .header-actions { display: flex; align-items: center; gap: 6px; }
 .last-updated { font-size: 0.82em; color: var(--vscode-descriptionForeground); }
 
-.stats { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px 0 14px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 6px; }
-.stat { display: flex; flex-direction: column; align-items: center; min-width: 44px; }
-.stat-count { font-size: 1.6em; font-weight: 700; line-height: 1.1; }
-.stat-label { font-size: 0.75em; color: var(--vscode-descriptionForeground); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+/* Premium Stats Dashboard Cards */
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  margin-bottom: 10px;
+}
+.stat {
+  flex: 1;
+  min-width: 70px;
+  background: var(--vscode-button-secondaryBackground, var(--vscode-panel-border));
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+  border-color: var(--vscode-focusBorder);
+}
+.stat-count { font-size: 1.4em; font-weight: 700; line-height: 1.1; }
+.stat-label { font-size: 0.72em; color: var(--vscode-descriptionForeground); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
 .stat-count.done-color    { color: var(--vscode-testing-iconPassed, #4caf50); }
 .stat-count.partial-color { color: var(--vscode-charts-orange, #d18616); }
 .stat-count.future-color  { color: var(--vscode-charts-purple, #b267e6); }
 .stat-count.pct-color     { color: var(--vscode-testing-iconPassed, #4caf50); }
 
-.progress-wrap { width: 100%; height: 5px; background: var(--vscode-panel-border); border-radius: 3px; overflow: hidden; margin-bottom: 16px; }
-.progress-bar { height: 100%; background: var(--vscode-testing-iconPassed, #4caf50); border-radius: 3px; transition: width 0.4s ease; }
+.stat-total { border-top: 3px solid var(--vscode-foreground); }
+.stat-done { border-top: 3px solid var(--vscode-testing-iconPassed, #4caf50); background: color-mix(in srgb, var(--vscode-testing-iconPassed, #4caf50) 6%, var(--vscode-button-secondaryBackground, var(--vscode-panel-border))); }
+.stat-partial { border-top: 3px solid var(--vscode-charts-orange, #d18616); background: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 6%, var(--vscode-button-secondaryBackground, var(--vscode-panel-border))); }
+.stat-open { border-top: 3px solid var(--vscode-badge-background, #5a5a5a); }
+.stat-future { border-top: 3px solid var(--vscode-charts-purple, #b267e6); background: color-mix(in srgb, var(--vscode-charts-purple, #b267e6) 6%, var(--vscode-button-secondaryBackground, var(--vscode-panel-border))); }
+.stat-pct { border-top: 3px solid var(--vscode-testing-iconPassed, #4caf50); background: color-mix(in srgb, var(--vscode-testing-iconPassed, #4caf50) 6%, var(--vscode-button-secondaryBackground, var(--vscode-panel-border))); }
 
-.controls { margin-bottom: 16px; }
+.progress-wrap { width: 100%; height: 6px; background: var(--vscode-panel-border); border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, var(--vscode-testing-iconPassed, #4caf50), color-mix(in srgb, var(--vscode-testing-iconPassed, #4caf50) 70%, #ffffff)); border-radius: 3px; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 4px var(--vscode-testing-iconPassed, #4caf50); }
+
+.controls { margin-bottom: 4px; }
 .controls-top { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .controls-top .search-input { flex: 1; margin-bottom: 0; }
-.search-input { width: 100%; padding: 6px 10px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, transparent); border-radius: 4px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); outline: none; }
-.search-input:focus { border-color: var(--vscode-focusBorder); }
+.search-input { width: 100%; padding: 6px 12px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 4px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); outline: none; transition: all 0.2s ease; }
+.search-input:focus { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 1px var(--vscode-focusBorder); }
 .search-input::placeholder { color: var(--vscode-input-placeholderForeground); }
-.sort-select { padding: 5px 8px; background: var(--vscode-dropdown-background, var(--vscode-input-background)); color: var(--vscode-dropdown-foreground, var(--vscode-foreground)); border: 1px solid var(--vscode-dropdown-border, transparent); border-radius: 4px; font-family: var(--vscode-font-family); font-size: 0.82em; cursor: pointer; outline: none; white-space: nowrap; }
-.sort-select:focus { border-color: var(--vscode-focusBorder); }
+.sort-select { padding: 5px 8px; background: var(--vscode-dropdown-background, var(--vscode-input-background)); color: var(--vscode-dropdown-foreground, var(--vscode-foreground)); border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border)); border-radius: 4px; font-family: var(--vscode-font-family); font-size: 0.82em; cursor: pointer; outline: none; white-space: nowrap; transition: all 0.2s ease; }
+.sort-select:focus { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 1px var(--vscode-focusBorder); }
 
 .filters { display: flex; flex-wrap: wrap; gap: 6px; }
-.filter-btn { padding: 4px 10px; border-radius: 12px; border: 1px solid var(--vscode-panel-border); background: transparent; color: var(--vscode-foreground); cursor: pointer; font-size: 0.82em; font-family: var(--vscode-font-family); transition: background 0.15s; }
-.filter-btn:hover { background: var(--vscode-list-hoverBackground); }
-.filter-btn.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); }
+.filter-btn { padding: 4px 10px; border-radius: 12px; border: 1px solid var(--vscode-panel-border); background: transparent; color: var(--vscode-foreground); cursor: pointer; font-size: 0.82em; font-family: var(--vscode-font-family); transition: all 0.2s ease; }
+.filter-btn:hover { background: var(--vscode-list-hoverBackground); transform: translateY(-1px); }
+.filter-btn.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
 
 .modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 12px; }
 .btn-add-module-wrap { margin-top: 12px; }
 
 /* module card */
-.module-card { border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: hidden; }
+.module-card { border: 1px solid var(--vscode-panel-border); border-radius: 8px; background: var(--vscode-editor-background); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; overflow: hidden; }
+.module-card:hover { border-color: var(--vscode-focusBorder); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); }
 .module-card.mod-dragging { opacity: 0.35; }
 .module-card.mod-drag-over-top    { border-top: 2px solid var(--vscode-focusBorder) !important; }
 .module-card.mod-drag-over-bottom { border-bottom: 2px solid var(--vscode-focusBorder) !important; }
 
-.module-header { display: flex; align-items: center; padding: 9px 12px; background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editor-background)); user-select: none; gap: 6px; }
+.module-header { display: flex; align-items: center; padding: 9px 12px; background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editor-background)); user-select: none; gap: 6px; border-top-left-radius: 7px; border-top-right-radius: 7px; }
 .module-header:hover { background: var(--vscode-list-hoverBackground); }
 
 .module-drag-handle { flex-shrink: 0; color: var(--vscode-descriptionForeground); opacity: 0.25; cursor: grab; font-size: 15px; line-height: 1.4; padding: 0 10px; user-select: none; transition: opacity 0.1s; }
@@ -563,8 +615,9 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
 
 /* items list */
 .items-list { list-style: none; }
-.item { display: flex; align-items: flex-start; gap: 5px; padding: 5px 0; border-bottom: 1px solid var(--vscode-panel-border); }
+.item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--vscode-panel-border); transition: background-color 0.15s ease, border-color 0.15s ease; }
 .item:last-child { border-bottom: none; }
+.item:hover { background-color: color-mix(in srgb, var(--vscode-list-hoverBackground) 60%, transparent); }
 .item.dragging { opacity: 0.35; }
 .item.drag-over-top    { border-top: 2px solid var(--vscode-focusBorder) !important; }
 .item.drag-over-bottom { border-bottom: 2px solid var(--vscode-focusBorder) !important; }
@@ -595,20 +648,21 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
 
 /* add inline */
 .add-input-wrapper { margin-top: 6px; }
-.btn-add { display: block; width: 100%; padding: 4px 8px; background: transparent; color: var(--vscode-descriptionForeground); border: 1px dashed var(--vscode-panel-border); border-radius: 3px; cursor: pointer; font-size: 0.78em; font-family: var(--vscode-font-family); text-align: left; margin-top: 6px; opacity: 0.55; transition: opacity 0.15s, border-color 0.15s; }
-.btn-add:hover { opacity: 1; border-color: var(--vscode-focusBorder); color: var(--vscode-foreground); }
+.btn-add { display: block; width: 100%; padding: 6px 12px; background: transparent; color: var(--vscode-descriptionForeground); border: 1px dashed var(--vscode-panel-border); border-radius: 6px; cursor: pointer; font-size: 0.8em; font-family: var(--vscode-font-family); text-align: left; margin-top: 8px; opacity: 0.65; transition: all 0.2s ease; }
+.btn-add:hover { opacity: 1; border-color: var(--vscode-focusBorder); color: var(--vscode-foreground); background: color-mix(in srgb, var(--vscode-list-hoverBackground) 30%, transparent); transform: translateY(-1px); }
 
 /* generic buttons */
-.btn-primary { padding: 7px 16px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-family: var(--vscode-font-family); }
-.btn-primary:hover { background: var(--vscode-button-hoverBackground); }
-.btn-secondary { padding: 4px 10px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; border-radius: 3px; cursor: pointer; font-size: 0.82em; font-family: var(--vscode-font-family); }
-.btn-secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
-.btn-icon { padding: 3px 7px; background: transparent; color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-panel-border); border-radius: 3px; cursor: pointer; font-size: 0.82em; font-family: var(--vscode-font-family); line-height: 1.4; }
-.btn-icon:hover { background: var(--vscode-list-hoverBackground); color: var(--vscode-foreground); }
+.btn-primary { padding: 8px 16px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-family: var(--vscode-font-family); transition: all 0.15s ease; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.btn-primary:hover { background: var(--vscode-button-hoverBackground); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+.btn-secondary { padding: 4px 12px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: 1px solid var(--vscode-panel-border); border-radius: 4px; cursor: pointer; font-size: 0.82em; font-family: var(--vscode-font-family); transition: all 0.15s ease; font-weight: 500; }
+.btn-secondary:hover { background: var(--vscode-button-secondaryHoverBackground); border-color: var(--vscode-focusBorder); transform: translateY(-1px); }
+.btn-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0; background: transparent; color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-panel-border); border-radius: 4px; cursor: pointer; font-size: 0.9em; transition: all 0.15s ease; }
+.btn-icon:hover { background: var(--vscode-list-hoverBackground); color: var(--vscode-foreground); border-color: var(--vscode-focusBorder); transform: translateY(-1px); }
+.btn-icon:active { transform: translateY(0); }
 .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
 .btn-icon-danger:hover { background: color-mix(in srgb, var(--vscode-errorForeground, #f48771) 12%, transparent); color: var(--vscode-errorForeground, #f48771); border-color: var(--vscode-errorForeground, #f48771); }
 
-.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center; color: var(--vscode-descriptionForeground); gap: 10px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center; color: var(--vscode-descriptionForeground); gap: 10px; margin-top: 16px; }
 .empty-icon { font-size: 3em; }
 .empty-state h2 { font-size: 1.1em; color: var(--vscode-foreground); }
 .empty-state p { font-size: 0.9em; line-height: 1.6; }
@@ -655,17 +709,23 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 8px 12px;
   margin-bottom: 12px;
   font-size: 0.82em;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid var(--vscode-panel-border);
+  transition: all 0.2s ease;
+}
+.git-status-panel:hover {
+  border-color: var(--vscode-focusBorder);
 }
 .git-status-panel.git-clean {
-  background-color: color-mix(in srgb, var(--vscode-testing-iconPassed, #4caf50) 4%, transparent);
+  border-left: 3px solid var(--vscode-testing-iconPassed, #4caf50);
+  background-color: color-mix(in srgb, var(--vscode-testing-iconPassed, #4caf50) 6%, var(--vscode-editor-background));
 }
 .git-status-panel.git-dirty {
-  background-color: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 4%, transparent);
+  border-left: 3px solid var(--vscode-charts-orange, #d18616);
+  background-color: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 6%, var(--vscode-editor-background));
 }
 .git-info {
   display: flex;
@@ -713,6 +773,11 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
   flex-shrink: 0;
   margin-top: 4px;
   margin-right: 4px;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.item-status-select:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
 }
 .item-status-select.status-open {
   background-color: var(--vscode-badge-background, #5a5a5a);
@@ -1253,6 +1318,9 @@ function renderApp(data, settings, historyState, gitState) {
   var pct = s.total>0 ? Math.round(s.done/s.total*100) : 0;
   var html = '';
 
+  // Sticky topbar wrapper
+  html += '<div class="topbar">';
+
   // header
   html += '<div class="header"><div class="header-row"><h1>Open Items</h1><div class="header-actions">';
   html += '<button class="btn-icon" id="skillStatusBtn" title="AI Skill Status &amp; Install">&#x1F9E9;</button>';
@@ -1273,12 +1341,12 @@ function renderApp(data, settings, historyState, gitState) {
 
   // stats
   html += '<div class="stats">';
-  html += '<div class="stat"><span class="stat-count">'+s.total+'</span><span class="stat-label">Total</span></div>';
-  html += '<div class="stat"><span class="stat-count done-color">'+s.done+'</span><span class="stat-label">Done</span></div>';
-  html += '<div class="stat"><span class="stat-count partial-color">'+s.partial+'</span><span class="stat-label">Partial</span></div>';
-  html += '<div class="stat"><span class="stat-count">'+s.open+'</span><span class="stat-label">Open</span></div>';
-  if (s.future>0) { html += '<div class="stat"><span class="stat-count future-color">'+s.future+'</span><span class="stat-label">Future</span></div>'; }
-  html += '<div class="stat"><span class="stat-count pct-color">'+pct+'%</span><span class="stat-label">Complete</span></div>';
+  html += '<div class="stat stat-total"><span class="stat-count">'+s.total+'</span><span class="stat-label">Total</span></div>';
+  html += '<div class="stat stat-done"><span class="stat-count done-color">'+s.done+'</span><span class="stat-label">Done</span></div>';
+  html += '<div class="stat stat-partial"><span class="stat-count partial-color">'+s.partial+'</span><span class="stat-label">Partial</span></div>';
+  html += '<div class="stat stat-open"><span class="stat-count">'+s.open+'</span><span class="stat-label">Open</span></div>';
+  if (s.future>0) { html += '<div class="stat stat-future"><span class="stat-count future-color">'+s.future+'</span><span class="stat-label">Future</span></div>'; }
+  html += '<div class="stat stat-pct"><span class="stat-count pct-color">'+pct+'%</span><span class="stat-label">Complete</span></div>';
   html += '</div>';
   html += '<div class="progress-wrap"><div class="progress-bar" style="width:'+pct+'%"></div></div>';
 
@@ -1325,6 +1393,9 @@ function renderApp(data, settings, historyState, gitState) {
   if (settings.showDoneItems) { html += '<button class="filter-btn" data-filter="done">&#9989; Done ('+s.done+')</button>'; }
   if (settings.showFutureItems && s.future>0) { html += '<button class="filter-btn" data-filter="future">&#128302; Future ('+s.future+')</button>'; }
   html += '</div></div>';
+
+  // End topbar
+  html += '</div>';
 
   // modules grid
   html += '<div class="modules" id="modulesGrid">';
@@ -1504,5 +1575,17 @@ window.addEventListener('mouseup', function() {
   document.querySelectorAll('.item, .module-card, .subsection').forEach(function(el) {
     el.removeAttribute('draggable');
   });
+});
+
+// ── window scroll listener to toggle sticky shadow/border ──
+window.addEventListener('scroll', function() {
+  var topbar = document.querySelector('.topbar');
+  if (topbar) {
+    if (window.scrollY > 0) {
+      topbar.classList.add('is-sticky');
+    } else {
+      topbar.classList.remove('is-sticky');
+    }
+  }
 });
 `;

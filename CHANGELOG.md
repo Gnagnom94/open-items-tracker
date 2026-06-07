@@ -4,6 +4,19 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.1.1] - 2026-06-07
+
+### Changed
+
+- **Sticky topbar**: header, stats dashboard, progress bar, Git status panel, and search/filter controls now stay pinned at the top while scrolling, with a frosted-glass blur effect and subtle drop shadow when scrolled.
+- **Premium stats cards**: stat counters restyled as individual dashboard cards with accent-colored top borders, tinted backgrounds, and hover lift animations.
+- **Progress bar**: upgraded with a gradient fill and a soft glow shadow matching the completion color.
+- **Module cards**: added hover border highlight and elevated shadow on mouse-over for a more tactile feel.
+- **Item rows**: added subtle background highlight on hover.
+- **Buttons & controls**: unified icon buttons to consistent 28×28 boxes with smooth hover translations; search input and sort dropdown now show a focus ring glow; filter pills gain a slight lift on hover and a drop shadow when active.
+- **Status badges**: added scale and brightness micro-animation on hover.
+- **Add buttons**: rounded corners, background tint on hover, and slight lift animation.
+
 ## [0.1.0] - 2026-06-05
 
 ### Added
