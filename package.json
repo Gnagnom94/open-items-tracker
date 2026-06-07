@@ -2,7 +2,7 @@
   "name": "open-items-tracker",
   "displayName": "Open Items Tracker",
   "description": "Visualize, edit, and manage your open-items.md backlog inside VS Code, Cursor, Windsurf, and Antigravity IDE. Full CRUD for modules, sub-sections, and items; drag-to-reorder; inline editing; sort strategies; live file sync; and AI skill auto-install.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "Gnagnom94",
   "repository": {
     "type": "git",

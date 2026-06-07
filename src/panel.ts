@@ -62,6 +62,8 @@ export class OpenItemsPanel {
         case 'dropFile':   if (msg.uri) { this._dropFile(msg.uri); } break;
         case 'clearFile':  setStoredPath(undefined); break;
         case 'useActiveFile': this._useActiveFile(); break;
+        case 'openLink':
+          if (msg.target) { await this._openLinkTarget(msg.target); } break;
         case 'toggleItem':
           if (fp && msg.rawLine) { this._try(() => toggleItemInFile(fp, msg.rawLine)); } break;
         case 'changeStatus':
@@ -155,6 +157,58 @@ export class OpenItemsPanel {
     const fp = vscode.window.activeTextEditor?.document.fileName;
     if (fp) { setStoredPath(fp); }
     else { vscode.window.showWarningMessage('Open Items Tracker: no file active in editor.'); }
+  }
+
+  private async _openLinkTarget(target: string): Promise<void> {
+    let filePath: string;
+    let startLine: number | undefined;
+    let endLine: number | undefined;
+
+    // Separate fragment (#L10-L20) from path
+    const hashIdx = target.indexOf('#');
+    let rawPath = target;
+    if (hashIdx > 0) {
+      const fragment = target.substring(hashIdx + 1);
+      rawPath = target.substring(0, hashIdx);
+      const lineMatch = fragment.match(/^L(\d+)(?:-L?(\d+))?$/);
+      if (lineMatch) {
+        startLine = parseInt(lineMatch[1], 10);
+        endLine = lineMatch[2] ? parseInt(lineMatch[2], 10) : startLine;
+      }
+    }
+
+    // Resolve absolute vs relative path
+    if (rawPath.startsWith('file:///')) {
+      try {
+        filePath = vscode.Uri.parse(rawPath).fsPath;
+      } catch {
+        vscode.window.showWarningMessage(`Open Items Tracker: invalid link URI: ${rawPath}`);
+        return;
+      }
+    } else {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        vscode.window.showWarningMessage('Open Items Tracker: no workspace folder open to resolve relative path.');
+        return;
+      }
+      filePath = path.resolve(workspaceRoot, rawPath);
+    }
+
+    if (!fs.existsSync(filePath)) {
+      vscode.window.showWarningMessage(`File not found: ${rawPath}`);
+      return;
+    }
+
+    const doc = await vscode.workspace.openTextDocument(filePath);
+    const editor = await vscode.window.showTextDocument(doc, { preview: false });
+
+    if (startLine !== undefined) {
+      const zeroStart = Math.max(0, startLine - 1);
+      const zeroEnd = endLine !== undefined ? Math.max(0, endLine - 1) : zeroStart;
+      const range = new vscode.Range(zeroStart, 0, zeroEnd, 0);
+      editor.selection = new vscode.Selection(range.start, range.end);
+      editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    }
   }
 
   private _setupWatcher(): void {

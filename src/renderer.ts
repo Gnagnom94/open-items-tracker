@@ -644,7 +644,7 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
 .btn-delete:hover { opacity: 1 !important; color: var(--vscode-errorForeground, #f48771); background: color-mix(in srgb, var(--vscode-errorForeground, #f48771) 12%, transparent); }
 
 /* inline edit */
-.inline-edit-input { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-focusBorder); border-radius: 2px; padding: 1px 5px; font-family: var(--vscode-font-family); font-size: inherit; width: 100%; outline: none; }
+.inline-edit-input { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-focusBorder); border-radius: 2px; padding: 4px 5px; font-family: var(--vscode-font-family); font-size: inherit; width: 100%; outline: none; resize: vertical; min-height: 1.8em; overflow: hidden; word-wrap: break-word; overflow-wrap: break-word; white-space: pre-wrap; line-height: 1.45; field-sizing: content; }
 
 /* add inline */
 .add-input-wrapper { margin-top: 6px; }
@@ -795,6 +795,20 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
   background-color: var(--vscode-testing-iconPassed, #4caf50);
   color: #ffffff;
 }
+
+/* ── Clickable markdown links ─────────────────────────────────────────────── */
+.item-link {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  cursor: pointer;
+  border-bottom: 1px dotted color-mix(in srgb, var(--vscode-textLink-foreground) 40%, transparent);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.item-link:hover {
+  text-decoration: none;
+  color: var(--vscode-textLink-activeForeground);
+  border-bottom-color: var(--vscode-textLink-activeForeground);
+}
 `;
 
 // ── Shared file-drop script ───────────────────────────────────────────────────
@@ -836,6 +850,25 @@ function saveState() { vscode.setState({ currentSort: currentSort, activeFilter:
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderMarkdownLinks(escaped) {
+  var linkRe = new RegExp('\\\\[([^\\\\]]+)\\\\]\\\\(([^)]+)\\\\)', 'g');
+  var lineRe = new RegExp('^L(\\\\d+)(?:-L?(\\\\d+))?$');
+  return escaped.replace(linkRe, function(match, text, target) {
+    var safeTarget = target.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+    var tooltip = safeTarget;
+    var hashIdx = safeTarget.indexOf('#');
+    if (hashIdx > 0) {
+      var filePart = safeTarget.substring(0, hashIdx);
+      var fragment = safeTarget.substring(hashIdx + 1);
+      var lineMatch = fragment.match(lineRe);
+      if (lineMatch) {
+        tooltip = filePart + ' \u2014 line' + (lineMatch[2] ? 's ' + lineMatch[1] + '-' + lineMatch[2] : ' ' + lineMatch[1]);
+      }
+    }
+    return '<a href="#" class="item-link" data-link-target="' + esc(safeTarget) + '" title="' + esc(tooltip) + '">' + text + '</a>';
+  });
 }
 
 // ── sort ──
@@ -926,10 +959,10 @@ function renderItem(item, origIdx) {
   if (noteDiff) {
     noteHtml = '<div class="item-note" data-raw="'+rawKey+'" title="Click to edit">'+noteDiff+'</div>';
   } else if (item.note) {
-    noteHtml = '<div class="item-note" data-raw="'+rawKey+'" title="Click to edit">'+esc(item.note)+'</div>';
+    noteHtml = '<div class="item-note" data-raw="'+rawKey+'" data-raw-note="'+esc(item.note)+'" title="Click to edit">'+renderMarkdownLinks(esc(item.note))+'</div>';
   }
   
-  var textHtml = (currentSettings && currentSettings.gitHighlight && currentSettings.gitShowInlineDiff && currentGitState && currentGitState.itemDiffHtml[item.rawLine]) || esc(item.text);
+  var textHtml = (currentSettings && currentSettings.gitHighlight && currentSettings.gitShowInlineDiff && currentGitState && currentGitState.itemDiffHtml[item.rawLine]) || renderMarkdownLinks(esc(item.text));
 
   return (
     '<li class="item' + gitClass + '" data-status="'+item.status+'" data-raw="'+rawKey+'" data-text="'+esc(item.text)+'" data-orig-idx="'+origIdx+'">' +
@@ -1054,18 +1087,22 @@ function showAddInput(container, placeholder, onConfirm) {
 }
 
 // ── inline text edit ──
-function startInlineEdit(el, originalText, onSave) {
-  var input = document.createElement('input');
-  input.type='text'; input.className='inline-edit-input'; input.value=originalText;
+function startInlineEdit(el, originalText, onSave, renderFn) {
+  var input = document.createElement('textarea');
+  input.className='inline-edit-input'; input.value=originalText; input.rows=1;
   el.replaceChildren(input); input.focus(); input.select();
   var saved = false;
+  function restore(text) {
+    if (renderFn) { el.innerHTML = renderFn(text); }
+    else { el.textContent = text; }
+  }
   function save() {
     if (saved) { return; } saved=true;
     var newText = input.value.trim();
-    if (newText && newText!==originalText) { onSave(newText); el.textContent=newText; }
-    else { el.textContent=originalText; }
+    if (newText && newText!==originalText) { onSave(newText); restore(newText); }
+    else { restore(originalText); }
   }
-  function cancel() { if (saved) { return; } saved=true; el.textContent=originalText; }
+  function cancel() { if (saved) { return; } saved=true; restore(originalText); }
   input.addEventListener('blur', save);
   input.addEventListener('keydown', function(e){
     if (e.key==='Enter') { e.preventDefault(); input.blur(); }
@@ -1076,6 +1113,13 @@ function startInlineEdit(el, originalText, onSave) {
 function initInlineEdit(root) {
   root.addEventListener('click', function(e) {
     if (e.target.closest('.inline-edit-input')) { return; }
+    var link = e.target.closest('.item-link');
+    if (link) {
+      e.preventDefault();
+      e.stopPropagation();
+      vscode.postMessage({ command: 'openLink', target: link.getAttribute('data-link-target') });
+      return;
+    }
     e.stopPropagation();
     var tc = e.target.closest('.item-text-content');
     if (tc) {
@@ -1083,7 +1127,7 @@ function initInlineEdit(root) {
       if (item.classList.contains('git-deleted')) { return; }
       var rawLine = decodeURIComponent(item.getAttribute('data-raw')||'');
       var origText = item.getAttribute('data-text') || tc.textContent.trim();
-      startInlineEdit(tc, origText, function(t){ item.setAttribute('data-text',t); vscode.postMessage({command:'editItem',rawLine:rawLine,newText:t}); });
+      startInlineEdit(tc, origText, function(t){ item.setAttribute('data-text',t); vscode.postMessage({command:'editItem',rawLine:rawLine,newText:t}); }, function(t){ return renderMarkdownLinks(esc(t)); });
       return;
     }
     var mt = e.target.closest('.module-title');
@@ -1103,7 +1147,8 @@ function initInlineEdit(root) {
       var item2 = ne.closest('.item');
       if (item2 && item2.classList.contains('git-deleted')) { return; }
       var raw3 = decodeURIComponent(ne.getAttribute('data-raw')||'');
-      startInlineEdit(ne, ne.textContent.trim(), function(t){ vscode.postMessage({command:'editItemNote',rawLine:raw3,newNote:t}); });
+      var rawNote = ne.getAttribute('data-raw-note') || ne.textContent.trim();
+      startInlineEdit(ne, rawNote, function(t){ ne.setAttribute('data-raw-note',t); vscode.postMessage({command:'editItemNote',rawLine:raw3,newNote:t}); }, function(t){ return renderMarkdownLinks(esc(t)); });
       return;
     }
     var ctx = e.target.closest('.module-context');

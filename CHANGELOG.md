@@ -4,6 +4,27 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.0] - 2026-06-07
+
+### Added
+
+- **Clickable markdown links**: `[text](path)` links in item text and notes are now rendered as clickable, themed links that open the target file in the editor.
+- **Line-range navigation**: links with `#L10-L20` fragments open the file and jump to the specified line range with selection.
+- **Legacy `file:///` URI support**: absolute `file:///` URIs from older backlog files are handled as clickable links alongside relative paths.
+- **Hover tooltips on links**: hovering a link shows the full target path and line range.
+- **Resizable textarea for inline editing**: inline edit now uses a `<textarea>` with soft-wrapping, auto-sizing (`field-sizing: content`), and vertical drag-to-resize.
+- **Skill update detection**: the installer now compares installed vs. bundled skill content on startup; if they differ, it prompts to update. The status dialog shows ⚠️ "Update available" when the skill is outdated.
+- **Recursive skill install**: the installer now copies the entire skill folder (including `references/`, `scripts/`, etc.) instead of just `SKILL.md`, making it future-proof for richer skill structures.
+
+### Changed
+
+- **Inline editing preserves link syntax**: editing a note or item text now shows raw markdown `[text](path)` syntax in the input; saving/canceling restores rendered clickable links.
+- **Skill updated for relative paths**: the bundled `SKILL.md` now instructs the AI agent to use relative paths from the project root (e.g., `[guest.py](backend/models/guest.py#L5-L24)`) instead of absolute `file:///` URIs.
+
+### Fixed
+
+- **Missing file warning**: clicking a link whose target file no longer exists shows a VS Code warning notification instead of failing silently.
+
 ## [0.1.1] - 2026-06-07
 
 ### Changed

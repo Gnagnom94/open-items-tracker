@@ -43,18 +43,47 @@ function isDefaultAntigravityPathUnverified(ide: IDEKind): boolean {
     return isDefault && isNonWindows;
 }
 
-function getSourceFile(context: vscode.ExtensionContext): string {
-    return path.join(context.extensionUri.fsPath, 'skills', 'open-items-tracker', 'SKILL.md');
+function getSourceDir(context: vscode.ExtensionContext): string {
+    return path.join(context.extensionUri.fsPath, 'skills', 'open-items-tracker');
+}
+
+function collectRelativeFiles(dir: string, base?: string): string[] {
+    const root = base ?? dir;
+    const files: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) { files.push(...collectRelativeFiles(full, root)); }
+        else { files.push(path.relative(root, full)); }
+    }
+    return files.sort();
 }
 
 async function copySkill(context: vscode.ExtensionContext, targetDir: string): Promise<boolean> {
-    const targetFile = path.join(targetDir, 'SKILL.md');
+    const sourceDir = getSourceDir(context);
     try {
-        fs.mkdirSync(targetDir, { recursive: true });
-        fs.copyFileSync(getSourceFile(context), targetFile);
+        fs.cpSync(sourceDir, targetDir, { recursive: true, force: true });
         return true;
     } catch (err) {
         vscode.window.showErrorMessage(`Open Items Tracker: Failed to install skill — ${err}`);
+        return false;
+    }
+}
+
+function isSkillOutdated(context: vscode.ExtensionContext, targetDir: string): boolean {
+    if (!fs.existsSync(path.join(targetDir, 'SKILL.md'))) { return false; }
+    const sourceDir = getSourceDir(context);
+    try {
+        const bundledFiles = collectRelativeFiles(sourceDir);
+        const installedFiles = collectRelativeFiles(targetDir);
+        if (bundledFiles.length !== installedFiles.length) { return true; }
+        if (bundledFiles.join('\n') !== installedFiles.join('\n')) { return true; }
+        for (const rel of bundledFiles) {
+            const bundled = fs.readFileSync(path.join(sourceDir, rel), 'utf8');
+            const installed = fs.readFileSync(path.join(targetDir, rel), 'utf8');
+            if (bundled !== installed) { return true; }
+        }
+        return false;
+    } catch {
         return false;
     }
 }
@@ -67,7 +96,9 @@ export async function promptSkillInstall(context: vscode.ExtensionContext): Prom
     const ide = detectIDE();
     const targetDir = getTargetSkillDir(ide);
     const targetFile = path.join(targetDir, 'SKILL.md');
-    if (fs.existsSync(targetFile)) { return; }
+    const isInstalled = fs.existsSync(targetFile);
+
+    if (isInstalled && !isSkillOutdated(context, targetDir)) { return; }
 
     // delay so the prompt doesn't collide with other activation-time UI
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -77,18 +108,34 @@ export async function promptSkillInstall(context: vscode.ExtensionContext): Prom
         ? ' ⚠ Path unverified on this OS — set Settings › skillPathAntigravity if wrong.'
         : '';
 
-    const action = await vscode.window.showInformationMessage(
-        `Open Items Tracker: Install the AI skill for ${ideName}? → ${targetDir}${warning}`,
-        'Install',
-        'Not Now',
-        "Don't Ask Again"
-    );
-
-    if (action === 'Install') {
-        const ok = await copySkill(context, targetDir);
-        if (ok) { vscode.window.showInformationMessage(`Open Items Tracker: Skill installed to ${targetDir}`); }
-    } else if (action === "Don't Ask Again") {
-        await context.globalState.update(DONT_ASK_KEY, true);
+    if (isInstalled) {
+        // Skill exists but is outdated
+        const action = await vscode.window.showInformationMessage(
+            `Open Items Tracker: AI skill update available for ${ideName}. Update now?${warning}`,
+            'Update',
+            'Not Now',
+            "Don't Ask Again"
+        );
+        if (action === 'Update') {
+            const ok = await copySkill(context, targetDir);
+            if (ok) { vscode.window.showInformationMessage(`Open Items Tracker: Skill updated at ${targetDir}`); }
+        } else if (action === "Don't Ask Again") {
+            await context.globalState.update(DONT_ASK_KEY, true);
+        }
+    } else {
+        // Skill not installed
+        const action = await vscode.window.showInformationMessage(
+            `Open Items Tracker: Install the AI skill for ${ideName}? → ${targetDir}${warning}`,
+            'Install',
+            'Not Now',
+            "Don't Ask Again"
+        );
+        if (action === 'Install') {
+            const ok = await copySkill(context, targetDir);
+            if (ok) { vscode.window.showInformationMessage(`Open Items Tracker: Skill installed to ${targetDir}`); }
+        } else if (action === "Don't Ask Again") {
+            await context.globalState.update(DONT_ASK_KEY, true);
+        }
     }
 }
 
@@ -97,21 +144,29 @@ export async function showSkillStatus(context: vscode.ExtensionContext): Promise
     const targetDir = getTargetSkillDir(ide);
     const targetFile = path.join(targetDir, 'SKILL.md');
     const isInstalled = fs.existsSync(targetFile);
+    const outdated = isInstalled && isSkillOutdated(context, targetDir);
     const ideName = getIDEName(ide);
     const pathUnverified = isDefaultAntigravityPathUnverified(ide);
 
-    type Action = 'install' | 'reinstall' | 'openFolder' | 'resetPrompt';
+    type Action = 'install' | 'reinstall' | 'update' | 'openFolder' | 'resetPrompt';
     const items: (vscode.QuickPickItem & { action: Action })[] = [];
 
     if (pathUnverified) {
         items.push({
             label: '$(warning) Path unverified on this OS',
             description: 'Default path may not match your installation — set "skillPathAntigravity" in Settings to override',
-            action: 'openFolder', // placeholder, handled below
+            action: 'openFolder',
         });
     }
 
     if (isInstalled) {
+        if (outdated) {
+            items.push({
+                label: '$(cloud-download) Update Skill',
+                description: 'Installed skill differs from bundled version — update now',
+                action: 'update'
+            });
+        }
         items.push({
             label: '$(sync) Reinstall',
             description: 'Overwrite with the bundled version',
@@ -136,10 +191,11 @@ export async function showSkillStatus(context: vscode.ExtensionContext): Promise
         action: 'resetPrompt'
     });
 
-    const statusIcon = isInstalled ? '✅' : '❌';
+    const statusIcon = !isInstalled ? '❌' : outdated ? '⚠️' : '✅';
+    const statusText = !isInstalled ? `Not installed — target: ${targetDir}` : outdated ? `Update available — ${targetDir}` : `Up to date — ${targetDir}`;
     const qp = vscode.window.createQuickPick<vscode.QuickPickItem & { action: Action }>();
     qp.title = `AI Skill — ${ideName}`;
-    qp.placeholder = `${statusIcon} ${isInstalled ? `Installed at ${targetDir}` : `Not installed — target: ${targetDir}`}`;
+    qp.placeholder = `${statusIcon} ${statusText}`;
     qp.items = items;
     qp.ignoreFocusOut = false;
 
@@ -156,12 +212,14 @@ export async function showSkillStatus(context: vscode.ExtensionContext): Promise
 
         switch (selected.action) {
             case 'install':
-            case 'reinstall': {
+            case 'reinstall':
+            case 'update': {
                 await context.globalState.update(DONT_ASK_KEY, false);
                 const ok = await copySkill(context, targetDir);
-                if (ok) { vscode.window.showInformationMessage(
-                    `Open Items Tracker: Skill ${selected.action === 'reinstall' ? 'reinstalled' : 'installed'} to ${targetDir}`
-                ); }
+                if (ok) {
+                    const verb = selected.action === 'install' ? 'installed' : selected.action === 'update' ? 'updated' : 'reinstalled';
+                    vscode.window.showInformationMessage(`Open Items Tracker: Skill ${verb} at ${targetDir}`);
+                }
                 break;
             }
             case 'openFolder':

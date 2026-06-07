@@ -114,7 +114,7 @@ Brief context about this module's purpose.
 
 ### Sub-section (if needed, e.g., "Phase A — Feature Name") Status-Emoji
 
-- [x] ~~**Completed item description**~~ — done (YYYY-MM-DD). Brief note on what was done and where.
+- [x] ~~**Completed item description**~~ — done (YYYY-MM-DD). Implemented in [model.py](backend/models/model.py#L5-L24) and [ViewName.vue](frontend/src/views/ViewName.vue).
 - [ ] **Open item description** — context on what's needed and why.
 - [ ] **Another open item** — with reference to requirement ID if applicable (e.g., RF-GW-003).
 
@@ -143,7 +143,7 @@ Brief context about this module's purpose.
 ### Writing Style
 
 - Write in the language of the formal documentation (if Italian, keep Italian; if English, keep English)
-- Be specific: reference actual file paths, model names, endpoint URLs when marking items as done
+- Be specific: reference actual file paths using **relative paths from the project root** with standard markdown link syntax (e.g., `[guest.py](backend/models/guest.py#L5-L24)`). Never use `file:///` URIs or absolute filesystem paths — they are non-portable and break across machines
 - Keep open items actionable: "Implement X" not "X needs to be done someday"
 - Include priority from the formal specs when available
 - Cross-reference diary entries when an open item originated there
