@@ -23,17 +23,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Compile
+      - name: Compile extension
+        run: npm run compile
+
+      - name: Compile tests
         run: npm run compile-tests
 
       - name: Run tests with coverage
-        run: xvfb-run -a npx @vscode/test-cli --coverage --coverage-reporter text --coverage-output ./coverage 2>&1 | tee coverage-output.txt
+        env:
+          NO_COLOR: 1
+        run: xvfb-run -a npx @vscode/test-cli --coverage --coverage-reporter json-summary --coverage-reporter text --coverage-output ./coverage 2>&1 | tee coverage-output.txt
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/coverage-summary.json
+            coverage-output.txt
 
       - name: Extract coverage percentage
         id: coverage
         run: |
-          # Parse "All files" line from the coverage table
-          COVERAGE=$(grep "All files" coverage-output.txt | awk -F'|' '{gsub(/ /, "", $2); print $2}')
+          # Debug: show coverage output directory
+          ls -la ./coverage/ || echo "No coverage directory found"
+          # Read statement coverage from the JSON summary (deterministic)
+          COVERAGE=$(node -p "JSON.parse(require('fs').readFileSync('./coverage/coverage-summary.json','utf8')).total.statements.pct")
           echo "percentage=${COVERAGE}" >> "$GITHUB_OUTPUT"
           echo "✅ Coverage: ${COVERAGE}%"
 

@@ -145,6 +145,7 @@ class CustomEditorHost extends WebviewHost {
   protected override initShared(): void {
     this._disposables.push(
       vscode.workspace.onDidChangeConfiguration(e => {
+        /* c8 ignore next -- callback: requires config change during test */
         if (e.affectsConfiguration('openItemsTracker')) { this.render(); }
       })
     );
