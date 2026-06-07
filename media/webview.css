@@ -43,22 +43,20 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
 .header { margin-bottom: 12px; }
 .header-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
 .header-row h1 { font-size: 1.3em; font-weight: 600; }
-.header-actions { display: flex; align-items: center; gap: 6px; }
+.header-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .last-updated { font-size: 0.82em; color: var(--vscode-descriptionForeground); }
 
 /* ── Premium Stats Dashboard Cards ────────────────────────────────────────── */
 
 .stats {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.5em, 1fr));
   gap: 8px;
   padding: 8px 0 12px;
   border-bottom: 1px solid var(--vscode-panel-border);
   margin-bottom: 10px;
 }
 .stat {
-  flex: 1;
-  min-width: 70px;
   background: var(--vscode-button-secondaryBackground, var(--vscode-panel-border));
   border: 1px solid var(--vscode-panel-border);
   border-radius: 6px;
@@ -198,7 +196,7 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
 
 .btn-primary { padding: 8px 16px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-family: var(--vscode-font-family); transition: all 0.15s ease; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .btn-primary:hover { background: var(--vscode-button-hoverBackground); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
-.btn-secondary { padding: 4px 12px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: 1px solid var(--vscode-panel-border); border-radius: 4px; cursor: pointer; font-size: 0.82em; font-family: var(--vscode-font-family); transition: all 0.15s ease; font-weight: 500; }
+.btn-secondary { padding: 4px 12px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: 1px solid var(--vscode-panel-border); border-radius: 4px; cursor: pointer; font-size: 0.82em; font-family: var(--vscode-font-family); transition: all 0.15s ease; font-weight: 500; white-space: nowrap; }
 .btn-secondary:hover { background: var(--vscode-button-secondaryHoverBackground); border-color: var(--vscode-focusBorder); transform: translateY(-1px); }
 .btn-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0; background: transparent; color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-panel-border); border-radius: 4px; cursor: pointer; font-size: 0.9em; transition: all 0.15s ease; }
 .btn-icon:hover { background: var(--vscode-list-hoverBackground); color: var(--vscode-foreground); border-color: var(--vscode-focusBorder); transform: translateY(-1px); }
@@ -359,4 +357,71 @@ code { font-family: var(--vscode-editor-font-family, monospace); background: var
   text-decoration: none;
   color: var(--vscode-textLink-activeForeground);
   border-bottom-color: var(--vscode-textLink-activeForeground);
+}
+
+/* ── Font size controls ──────────────────────────────────────────────────── */
+
+.font-size-controls { display: inline-flex; align-items: center; gap: 2px; margin-left: 2px; }
+.btn-font { font-weight: 700; font-size: 0.72em !important; min-width: 24px; width: auto; padding: 0 4px !important; }
+
+/* ── Responsive: narrow / sidebar layout ─────────────────────────────────── */
+
+@media (max-width: 360px) {
+  body { padding: 0 8px 12px 8px; }
+  .topbar { padding-top: 8px; padding-bottom: 4px; margin-bottom: 8px; }
+
+  /* header stacks vertically */
+  .header-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .header-row h1 { font-size: 1.1em; }
+  .header-actions { flex-wrap: wrap; gap: 4px; width: 100%; }
+
+  /* stats: 2 columns */
+  .stats { gap: 4px; padding: 4px 0 8px; }
+  .stat { min-width: 0; padding: 4px 2px; }
+  .stat-count { font-size: 1.1em; }
+  .stat-label { font-size: 0.65em; }
+
+  /* progress */
+  .progress-wrap { margin-bottom: 8px; }
+
+  /* git status */
+  .git-status-panel { padding: 6px 8px; font-size: 0.78em; flex-wrap: wrap; gap: 4px; }
+
+  /* controls */
+  .controls-top { flex-wrap: wrap; }
+  .search-input { font-size: 0.82em; padding: 5px 8px; }
+  .sort-select { font-size: 0.76em; }
+  .filters { gap: 4px; }
+  .filter-btn { padding: 3px 6px; font-size: 0.75em; }
+
+  /* modules */
+  .modules { gap: 8px; }
+  .module-header { padding: 6px 8px; gap: 4px; }
+  .module-title { font-size: 0.85em; }
+  .module-meta { gap: 4px; }
+  .module-count { font-size: 0.72em; }
+  .mini-progress { width: 40px; }
+  .module-body { padding: 4px 8px 6px; }
+  .module-context { font-size: 0.78em; }
+
+  /* subsections */
+  .subsection-title { font-size: 0.72em; }
+
+  /* items */
+  .item { gap: 4px; padding: 4px 4px; }
+  .item-text { font-size: 0.82em; }
+  .item-note { font-size: 0.75em; }
+  .item-badge { font-size: 0.68em; }
+  .item-date { font-size: 0.68em; }
+  .drag-handle { width: 20px; padding: 3px 4px 0; font-size: 13px; }
+  .module-drag-handle { padding: 0 6px; font-size: 13px; }
+
+  /* status select */
+  .item-status-select { font-size: 0.65em; padding: 1px 4px; }
+
+  /* buttons */
+  .btn-icon { width: 24px; height: 24px; font-size: 0.8em; }
+  .btn-secondary { padding: 3px 8px; font-size: 0.76em; }
+  .btn-add { font-size: 0.75em; padding: 5px 8px; }
+  .btn-font { min-width: 20px; font-size: 0.65em !important; }
 }

@@ -1,25 +1,28 @@
 // ── Abstract base class for webview hosts ────────────────────────────────────
-// Shared logic between OpenItemsPanel (WebviewPanel) and SidebarProvider (WebviewView).
-// Eliminates ~120 lines of duplicated code.
+// Shared logic between SidebarProvider, OpenItemsPanel, and CustomEditorHost.
+// Provides default fs-based implementations for mutations, rendering, and
+// change-listening. CustomEditorHost overrides these with TextDocument-based
+// implementations.
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseDocument } from './parser';
 import { getHtml, getNoFileHtml, getErrorHtml, computeGitDiff } from './webview/index';
-import {
-  toggleItemInFile, editItemTextInFile, editHeaderInFile,
-  editItemNoteInFile, editModuleContextInFile,
-  reorderItemsInFile, reorderModulesInFile, reorderSubSectionsInFile,
-  addItemToFile, deleteItemFromFile,
-  addModuleToFile, deleteModuleFromFile,
-  addSubSectionToFile, deleteSubSectionFromFile,
-  changeItemStatusInFile, revertFileContent
-} from './fileEditor';
+import { applyFsTransform, revertFileContent } from './fileEditor';
 import { getStoredPath, setStoredPath, onPathChange } from './store';
 import { readSettings } from './settings';
+import type { FontSizeKey } from './settings';
 import { getGitState } from './gitManager';
 import { undoRedoManager } from './undoRedoManager';
+import type { LinesTransform } from './fileTransforms';
+import type { HistoryState } from './shared/types';
+import {
+  toggleItem, changeItemStatus, editItemText, editItemNote,
+  editHeader, editModuleContext, addItem, deleteItem,
+  addModule, deleteModule, addSubSection, deleteSubSection,
+  reorderItems, reorderModules, reorderSubSections
+} from './fileTransforms';
 
 export abstract class WebviewHost {
   protected _disposables: vscode.Disposable[] = [];
@@ -40,70 +43,142 @@ export abstract class WebviewHost {
   /** Set the title (only meaningful for WebviewPanel, no-op for sidebar). */
   protected setTitle(_title: string): void { /* no-op by default */ }
 
+  /** Whether the host is bound to a fixed file (e.g. custom editor). Default: false. */
+  protected isFixedFile(): boolean { return false; }
+
+  /** Which font-size setting to use. Default: sidebar. */
+  protected fontSizeKey(): FontSizeKey { return 'fontSizeSidebar'; }
+
+  // ── Overridable I/O methods ────────────────────────────────────────────────
+  // Default implementations are fs-based. CustomEditorHost overrides these
+  // with TextDocument + WorkspaceEdit implementations.
+
+  /** Read the current file content and path. Default: fs.readFileSync. */
+  protected readFileContent(): { content: string; filePath: string } | undefined {
+    const fp = this.resolveFile();
+    if (!fp || !fs.existsSync(fp)) { return undefined; }
+    return { content: fs.readFileSync(fp, 'utf8'), filePath: fp };
+  }
+
+  /** Apply a pure line transformation. Default: fs-based via fileEditor. */
+  protected executeMutation(transform: LinesTransform): void {
+    const fp = this.resolveFile();
+    if (!fp) { return; }
+    applyFsTransform(fp, transform);
+  }
+
+  /** Handle undo action. Default: undoRedoManager. */
+  protected handleUndo(): void {
+    const fp = this.resolveFile();
+    if (!fp) { return; }
+    const currentContent = fs.readFileSync(fp, 'utf8');
+    const prevContent = undoRedoManager.undo(fp, currentContent);
+    if (prevContent !== undefined) {
+      this.tryAction(() => revertFileContent(fp, prevContent));
+      this.render();
+    }
+  }
+
+  /** Handle redo action. Default: undoRedoManager. */
+  protected handleRedo(): void {
+    const fp = this.resolveFile();
+    if (!fp) { return; }
+    const currentContent = fs.readFileSync(fp, 'utf8');
+    const nextContent = undoRedoManager.redo(fp, currentContent);
+    if (nextContent !== undefined) {
+      this.tryAction(() => revertFileContent(fp, nextContent));
+      this.render();
+    }
+  }
+
+  /** Get undo/redo availability for rendering. Default: undoRedoManager state. */
+  protected getHistoryState(): HistoryState {
+    const fp = this.resolveFile();
+    if (!fp) { return { hasUndo: false, hasRedo: false }; }
+    return {
+      hasUndo: undoRedoManager.hasUndo(fp),
+      hasRedo: undoRedoManager.hasRedo(fp),
+    };
+  }
+
+  /** Setup listener for file changes. Default: FileSystemWatcher. */
+  protected setupChangeListener(): void {
+    this._watcher?.dispose();
+    const fp = this.resolveFile();
+    if (!fp) { return; }
+    const pattern = new vscode.RelativePattern(path.dirname(fp), path.basename(fp));
+    this._watcher = vscode.workspace.createFileSystemWatcher(pattern);
+    this._watcher.onDidChange(() => {
+      if (!undoRedoManager.isInternalWrite) {
+        undoRedoManager.clearRedo(fp);
+      }
+      this.render();
+    }, null, this._disposables);
+    this._watcher.onDidCreate(() => this.render(), null, this._disposables);
+    this._disposables.push(this._watcher);
+  }
+
   // ── Message handling ───────────────────────────────────────────────────────
 
   protected handleMessage(msg: { command: string; [key: string]: unknown }): void {
-    const fp = this.resolveFile();
     switch (msg.command) {
       case 'skillStatus': vscode.commands.executeCommand('openItemsTracker.skillStatus'); break;
-      case 'openFile':
-        if (fp) { vscode.workspace.openTextDocument(fp).then(d => vscode.window.showTextDocument(d)); } break;
+      case 'openFile': {
+        const file = this.readFileContent();
+        if (file) { vscode.workspace.openTextDocument(file.filePath).then(d => vscode.window.showTextDocument(d)); }
+        break;
+      }
       case 'pickFile':   this.pickFile(); break;
       case 'dropFile':   if (msg.uri) { this.dropFile(msg.uri as string); } break;
       case 'clearFile':  setStoredPath(undefined); break;
       case 'useActiveFile': this.useActiveFile(); break;
       case 'openLink':
         if (msg.target) { this.openLinkTarget(msg.target as string); } break;
+
+      // ── Mutations — delegated to overridable executeMutation ────────────
       case 'toggleItem':
-        if (fp && msg.rawLine) { this.tryAction(() => toggleItemInFile(fp, msg.rawLine as string)); } break;
+        if (msg.rawLine) { this.tryAction(() => this.executeMutation(toggleItem(msg.rawLine as string))); } break;
       case 'changeStatus':
-        if (fp && msg.rawLine && msg.newStatus) { this.tryAction(() => changeItemStatusInFile(fp, msg.rawLine as string, msg.newStatus as 'open' | 'partial' | 'future' | 'done')); } break;
-      case 'undo':
-        if (fp) {
-          const currentContent = fs.readFileSync(fp, 'utf8');
-          const prevContent = undoRedoManager.undo(fp, currentContent);
-          if (prevContent !== undefined) {
-            this.tryAction(() => revertFileContent(fp, prevContent));
-            this.render();
-          }
-        }
-        break;
-      case 'redo':
-        if (fp) {
-          const currentContent = fs.readFileSync(fp, 'utf8');
-          const nextContent = undoRedoManager.redo(fp, currentContent);
-          if (nextContent !== undefined) {
-            this.tryAction(() => revertFileContent(fp, nextContent));
-            this.render();
-          }
-        }
-        break;
+        if (msg.rawLine && msg.newStatus) { this.tryAction(() => this.executeMutation(changeItemStatus(msg.rawLine as string, msg.newStatus as 'open' | 'partial' | 'future' | 'done'))); } break;
       case 'editItem':
-        if (fp && msg.rawLine && msg.newText) { this.tryAction(() => editItemTextInFile(fp, msg.rawLine as string, msg.newText as string)); } break;
+        if (msg.rawLine && msg.newText) { this.tryAction(() => this.executeMutation(editItemText(msg.rawLine as string, msg.newText as string))); } break;
       case 'editHeader':
-        if (fp && msg.rawLine && msg.newText) { this.tryAction(() => editHeaderInFile(fp, msg.rawLine as string, msg.newText as string)); } break;
-      case 'reorderItems':
-        if (fp && msg.oldOrder && msg.newOrder) { this.tryAction(() => reorderItemsInFile(fp, msg.oldOrder as string[], msg.newOrder as string[])); } break;
+        if (msg.rawLine && msg.newText) { this.tryAction(() => this.executeMutation(editHeader(msg.rawLine as string, msg.newText as string))); } break;
       case 'editItemNote':
-        if (fp && msg.rawLine) { this.tryAction(() => editItemNoteInFile(fp, msg.rawLine as string, (msg.newNote as string) || '')); } break;
+        if (msg.rawLine) { this.tryAction(() => this.executeMutation(editItemNote(msg.rawLine as string, (msg.newNote as string) || ''))); } break;
       case 'editModuleContext':
-        if (fp && msg.moduleRawLine && msg.newContext) { this.tryAction(() => editModuleContextInFile(fp, msg.moduleRawLine as string, msg.newContext as string)); } break;
+        if (msg.moduleRawLine && msg.newContext) { this.tryAction(() => this.executeMutation(editModuleContext(msg.moduleRawLine as string, msg.newContext as string))); } break;
       case 'addItem':
-        if (fp && msg.parentRawLine && msg.text) { this.tryAction(() => addItemToFile(fp, msg.parentRawLine as string, msg.text as string)); } break;
+        if (msg.parentRawLine && msg.text) { this.tryAction(() => this.executeMutation(addItem(msg.parentRawLine as string, msg.text as string))); } break;
       case 'deleteItem':
-        if (fp && msg.rawLine) { this.tryAction(() => deleteItemFromFile(fp, msg.rawLine as string)); } break;
+        if (msg.rawLine) { this.tryAction(() => this.executeMutation(deleteItem(msg.rawLine as string))); } break;
       case 'addModule':
-        if (fp && msg.title) { this.tryAction(() => addModuleToFile(fp, msg.title as string)); } break;
+        if (msg.title) { this.tryAction(() => this.executeMutation(addModule(msg.title as string))); } break;
       case 'deleteModule':
-        if (fp && msg.moduleRawLine) { this.tryAction(() => deleteModuleFromFile(fp, msg.moduleRawLine as string)); } break;
+        if (msg.moduleRawLine) { this.tryAction(() => this.executeMutation(deleteModule(msg.moduleRawLine as string))); } break;
       case 'addSubSection':
-        if (fp && msg.moduleRawLine && msg.title) { this.tryAction(() => addSubSectionToFile(fp, msg.moduleRawLine as string, msg.title as string)); } break;
+        if (msg.moduleRawLine && msg.title) { this.tryAction(() => this.executeMutation(addSubSection(msg.moduleRawLine as string, msg.title as string))); } break;
       case 'deleteSubSection':
-        if (fp && msg.subRawLine) { this.tryAction(() => deleteSubSectionFromFile(fp, msg.subRawLine as string)); } break;
+        if (msg.subRawLine) { this.tryAction(() => this.executeMutation(deleteSubSection(msg.subRawLine as string))); } break;
+      case 'reorderItems':
+        if (msg.oldOrder && msg.newOrder) { this.tryAction(() => this.executeMutation(reorderItems(msg.oldOrder as string[], msg.newOrder as string[]))); } break;
       case 'reorderModules':
-        if (fp && msg.oldOrder && msg.newOrder) { this.tryAction(() => reorderModulesInFile(fp, msg.oldOrder as string[], msg.newOrder as string[])); } break;
+        if (msg.oldOrder && msg.newOrder) { this.tryAction(() => this.executeMutation(reorderModules(msg.oldOrder as string[], msg.newOrder as string[]))); } break;
       case 'reorderSubSections':
-        if (fp && msg.moduleRawLine && msg.oldOrder && msg.newOrder) { this.tryAction(() => reorderSubSectionsInFile(fp, msg.moduleRawLine as string, msg.oldOrder as string[], msg.newOrder as string[])); } break;
+        if (msg.moduleRawLine && msg.oldOrder && msg.newOrder) { this.tryAction(() => this.executeMutation(reorderSubSections(msg.moduleRawLine as string, msg.oldOrder as string[], msg.newOrder as string[]))); } break;
+
+      // ── Font size ─────────────────────────────────────────────────────────
+      case 'setFontSize': {
+        const size = msg.size as number;
+        if (size >= 8 && size <= 24) {
+          vscode.workspace.getConfiguration('openItemsTracker').update(this.fontSizeKey(), size, vscode.ConfigurationTarget.Global);
+        }
+        break;
+      }
+
+      // ── Undo/Redo — delegated to overridable methods ───────────────────
+      case 'undo': this.handleUndo(); break;
+      case 'redo': this.handleRedo(); break;
     }
   }
 
@@ -129,9 +204,22 @@ export abstract class WebviewHost {
   }
 
   protected useActiveFile(): void {
+    // 1. Standard text editor
     const fp = vscode.window.activeTextEditor?.document.fileName;
-    if (fp) { setStoredPath(fp); }
-    else { vscode.window.showWarningMessage('Open Items Tracker: no file active in editor.'); }
+    if (fp) { setStoredPath(fp); return; }
+
+    // 2. Custom editor (activeTextEditor is undefined for custom editors)
+    const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    if (activeTab?.input instanceof vscode.TabInputCustom) {
+      setStoredPath(activeTab.input.uri.fsPath);
+      return;
+    }
+    if (activeTab?.input instanceof vscode.TabInputText) {
+      setStoredPath(activeTab.input.uri.fsPath);
+      return;
+    }
+
+    vscode.window.showWarningMessage('Open Items Tracker: no file active in editor.');
   }
 
   // ── Link navigation ────────────────────────────────────────────────────────
@@ -188,53 +276,33 @@ export abstract class WebviewHost {
     }
   }
 
-  // ── File watcher ───────────────────────────────────────────────────────────
-
-  protected setupWatcher(): void {
-    this._watcher?.dispose();
-    const fp = this.resolveFile();
-    if (!fp) { return; }
-    const pattern = new vscode.RelativePattern(path.dirname(fp), path.basename(fp));
-    this._watcher = vscode.workspace.createFileSystemWatcher(pattern);
-    this._watcher.onDidChange(() => {
-      if (!undoRedoManager.isInternalWrite) {
-        undoRedoManager.clearRedo(fp);
-      }
-      this.render();
-    }, null, this._disposables);
-    this._watcher.onDidCreate(() => this.render(), null, this._disposables);
-    this._disposables.push(this._watcher);
-  }
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   protected async render(): Promise<void> {
     const webview = this.getWebview();
     if (!webview) { return; }
-    const fp = this.resolveFile();
-    const settings = readSettings();
-    if (!fp) {
+    const settings = readSettings(this.fontSizeKey());
+    const fileInfo = this.readFileContent();
+    if (!fileInfo) {
       this.setHtml(getNoFileHtml(webview, this._extensionUri));
       this.setTitle('Open Items');
       return;
     }
     try {
-      const content = fs.readFileSync(fp, 'utf8');
-      const doc = parseDocument(content, fp);
+      const doc = parseDocument(fileInfo.content, fileInfo.filePath);
       this.setTitle(`Open Items (${doc.stats.done}/${doc.stats.total})`);
 
       let gitState;
       if (settings.gitIntegration) {
-        const rawGit = await getGitState(fp);
+        const rawGit = await getGitState(fileInfo.filePath);
         gitState = computeGitDiff(doc, rawGit.headContent, rawGit.isRepo, rawGit.status);
       } else {
         gitState = computeGitDiff(doc, undefined, false, 'clean');
       }
 
-      const hasUndo = undoRedoManager.hasUndo(fp);
-      const hasRedo = undoRedoManager.hasRedo(fp);
+      const historyState = this.getHistoryState();
 
-      this.setHtml(getHtml(webview, this._extensionUri, doc, settings, { hasUndo, hasRedo }, gitState));
+      this.setHtml(getHtml(webview, this._extensionUri, doc, settings, historyState, gitState, this.isFixedFile()));
     } catch {
       this.setHtml(getErrorHtml(webview, this._extensionUri));
     }
@@ -243,13 +311,13 @@ export abstract class WebviewHost {
   // ── Shared initialization ──────────────────────────────────────────────────
 
   protected initShared(): void {
-    this._disposables.push(onPathChange(() => { this.setupWatcher(); this.render(); }));
+    this._disposables.push(onPathChange(() => { this.setupChangeListener(); this.render(); }));
     this._disposables.push(
       vscode.workspace.onDidChangeConfiguration(e => {
         if (e.affectsConfiguration('openItemsTracker')) { this.render(); }
       })
     );
-    this.setupWatcher();
+    this.setupChangeListener();
     this.render();
   }
 

@@ -54,6 +54,7 @@ export interface ExtensionSettings {
   gitHighlight: boolean;
   gitShowInlineDiff: boolean;
   undoRedoStackSize: number;
+  fontSize: number;
 }
 
 // ── Git diff types ───────────────────────────────────────────────────────────

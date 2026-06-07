@@ -26,6 +26,7 @@ interface InitData {
   settings: ExtensionSettings;
   historyState: HistoryState;
   gitState: RenderGitState;
+  isFixedFile?: boolean;
 }
 
 const initData: InitData = (window as unknown as { __INIT_DATA__: InitData }).__INIT_DATA__;
@@ -593,6 +594,10 @@ function renderApp(data: ParsedDocument, settings: ExtensionSettings, historySta
 
   const app = document.getElementById('app');
   if (!app) { return; }
+
+  // Apply font size from settings
+  document.body.style.fontSize = settings.fontSize + 'px';
+
   const s = data.stats;
   const pct = s.total > 0 ? Math.round(s.done / s.total * 100) : 0;
   let html = '';
@@ -603,9 +608,11 @@ function renderApp(data: ParsedDocument, settings: ExtensionSettings, historySta
   // header
   html += '<div class="header"><div class="header-row"><h1>Open Items</h1><div class="header-actions">';
   html += '<button class="btn-icon" id="skillStatusBtn" title="AI Skill Status &amp; Install">&#x1F9E9;</button>';
-  html += '<button class="btn-icon" id="useActiveBtn" title="Use active editor file">&#128196;</button>';
-  html += '<button class="btn-icon" id="changeFileBtn" title="Choose file">&#128194;</button>';
-  html += '<button class="btn-icon btn-icon-danger" id="clearFileBtn" title="Clear">&#10005;</button>';
+  if (!initData.isFixedFile) {
+    html += '<button class="btn-icon" id="useActiveBtn" title="Use active editor file">&#8601;</button>';
+    html += '<button class="btn-icon" id="changeFileBtn" title="Choose file">&hellip;</button>';
+    html += '<button class="btn-icon btn-icon-danger" id="clearFileBtn" title="Clear">&#128465;</button>';
+  }
 
   // Undo/Redo buttons
   const undoDisabled = !currentHistoryState || !currentHistoryState.hasUndo ? ' disabled' : '';
@@ -613,7 +620,14 @@ function renderApp(data: ParsedDocument, settings: ExtensionSettings, historySta
   html += '<button class="btn-icon" id="undoBtn" title="Undo (Ctrl+Z)"' + undoDisabled + '>&#8630;</button>';
   html += '<button class="btn-icon" id="redoBtn" title="Redo (Ctrl+Shift+Z)"' + redoDisabled + '>&#8631;</button>';
 
-  if (data.filePath) { html += '<button class="btn-secondary" id="openFileBtn">Open File &#8599;</button>'; }
+  // Font size controls
+  html += '<span class="font-size-controls">';
+  html += '<button class="btn-icon btn-font" id="fontDecBtn" title="Decrease font size">A&#8722;</button>';
+  html += '<button class="btn-icon btn-font" id="fontResetBtn" title="Reset font size">A</button>';
+  html += '<button class="btn-icon btn-font" id="fontIncBtn" title="Increase font size">A+</button>';
+  html += '</span>';
+
+  if (data.filePath) { html += '<button class="btn-secondary" id="openFileBtn">Raw &#8599;</button>'; }
   html += '</div></div>';
   if (data.lastUpdated) { html += '<div class="last-updated">Last updated: ' + esc(data.lastUpdated) + '</div>'; }
   html += '</div>';
@@ -809,6 +823,32 @@ function renderApp(data: ParsedDocument, settings: ExtensionSettings, historySta
   const redoBtn = document.getElementById('redoBtn');
   if (redoBtn) { redoBtn.addEventListener('click', function () { vscode.postMessage({ command: 'redo' }); }); }
 
+  // Font size buttons
+  const fontDecBtn = document.getElementById('fontDecBtn');
+  const fontResetBtn = document.getElementById('fontResetBtn');
+  const fontIncBtn = document.getElementById('fontIncBtn');
+  if (fontDecBtn) {
+    fontDecBtn.addEventListener('click', function () {
+      const newSize = Math.max(8, (currentSettings?.fontSize || 13) - 1);
+      document.body.style.fontSize = newSize + 'px';
+      vscode.postMessage({ command: 'setFontSize', size: newSize });
+    });
+  }
+  if (fontResetBtn) {
+    fontResetBtn.addEventListener('click', function () {
+      const defaultSize = initData.isFixedFile ? 13 : 12;
+      document.body.style.fontSize = defaultSize + 'px';
+      vscode.postMessage({ command: 'setFontSize', size: defaultSize });
+    });
+  }
+  if (fontIncBtn) {
+    fontIncBtn.addEventListener('click', function () {
+      const newSize = Math.min(24, (currentSettings?.fontSize || 13) + 1);
+      document.body.style.fontSize = newSize + 'px';
+      vscode.postMessage({ command: 'setFontSize', size: newSize });
+    });
+  }
+
   // search
   const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
   if (searchInput) {
@@ -878,7 +918,7 @@ window.addEventListener('scroll', function () {
 // Check if this is the main app page (has init data) or the no-file/drop-zone page
 if (initData) {
   renderApp(initData.data, initData.settings, initData.historyState, initData.gitState);
-  initDragDrop();
+  if (!initData.isFixedFile) { initDragDrop(); }
 } else {
   // No-file page: init the drop zone
   const dropZone = document.getElementById('dropZone');

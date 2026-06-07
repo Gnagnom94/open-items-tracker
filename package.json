@@ -2,7 +2,7 @@
   "name": "open-items-tracker",
   "displayName": "Open Items Tracker",
   "description": "Visualize, edit, and manage your open-items.md backlog inside VS Code, Cursor, Windsurf, and Antigravity IDE. Full CRUD for modules, sub-sections, and items; drag-to-reorder; inline editing; sort strategies; live file sync; and AI skill auto-install.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "publisher": "Gnagnom94",
   "repository": {
     "type": "git",
@@ -35,7 +35,9 @@
     "theme": "dark"
   },
   "icon": "resources/icon.png",
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -78,7 +80,7 @@
       "editor/title": [
         {
           "command": "openItemsTracker.showPanel",
-          "when": "resourceFilename == 'open-items.md'",
+          "when": "openItemsTracker.isOpenItemsFile",
           "group": "navigation"
         }
       ],
@@ -146,6 +148,20 @@
           "default": 50,
           "description": "Maximum number of undo steps to retain in history."
         },
+        "openItemsTracker.fontSizeSidebar": {
+          "type": "integer",
+          "default": 12,
+          "minimum": 8,
+          "maximum": 24,
+          "description": "Base font size (px) for the Sidebar panel."
+        },
+        "openItemsTracker.fontSizeEditor": {
+          "type": "integer",
+          "default": 13,
+          "minimum": 8,
+          "maximum": 24,
+          "description": "Base font size (px) for the Custom Editor panel."
+        },
         "openItemsTracker.promptSkillInstall": {
           "type": "boolean",
           "default": true,
@@ -162,7 +178,19 @@
           "description": "Override the target directory for the AI skill when running in Antigravity IDE. Leave empty to use the default: ~/.gemini/config/skills/open-items-tracker/"
         }
       }
-    }
+    },
+    "customEditors": [
+      {
+        "viewType": "openItemsTracker.markdownEditor",
+        "displayName": "Open Items Tracker",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

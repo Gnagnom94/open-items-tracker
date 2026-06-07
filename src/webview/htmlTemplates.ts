@@ -32,7 +32,8 @@ export function getHtml(
   data: ParsedDocument,
   settings: ExtensionSettings,
   historyState: HistoryState,
-  gitState: RenderGitState
+  gitState: RenderGitState,
+  isFixedFile = false
 ): string {
   const n = nonce();
   const cssUri = getCssUri(webview, extensionUri);
@@ -47,12 +48,12 @@ export function getHtml(
   <link rel="stylesheet" href="${cssUri}">
 </head>
 <body>
-  <div id="dropOverlay" class="drop-overlay hidden">
+  ${isFixedFile ? '' : `<div id="dropOverlay" class="drop-overlay hidden">
     <div class="drop-message">&#128194; Drop open-items.md here</div>
-  </div>
+  </div>`}
   <div id="app"></div>
   <script nonce="${n}">
-    window.__INIT_DATA__ = ${JSON.stringify({ data, settings, historyState, gitState })};
+    window.__INIT_DATA__ = ${JSON.stringify({ data, settings, historyState, gitState, isFixedFile })};
   </script>
   <script nonce="${n}" src="${scriptUri}"></script>
 </body>

@@ -31,7 +31,7 @@ Questa estensione viene pubblicata automaticamente tramite GitHub Actions su **O
 ### 1. Aggiorna la versione in `package.json`
 
 ```json
-"version": "0.2.1"
+"version": "<X.Y.Z>"
 ```
 
 ### 2. Aggiorna il `CHANGELOG.md`
@@ -42,8 +42,8 @@ Documenta le modifiche della nuova versione.
 
 ```bash
 git add -A
-git commit -m "chore: release v0.2.1"
-git tag v0.2.1
+git commit -m "chore: release v<X.Y.Z>"
+git tag v<X.Y.Z>
 git push origin main --tags
 ```
 

@@ -4,6 +4,29 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.0] - 2026-06-07
+
+### Added
+
+- **Custom Editor integration**: the extension now registers as a custom editor for `.md` files, allowing the Open Items panel to open directly as an editor tab via "Reopen With…" or the action bar button.
+- **Content-based action bar button**: a "Show Panel" button appears in the editor title bar only when the active markdown file contains open-items syntax (`## ` headers + `[ ]`/`[x]` checkboxes).
+- **Font size controls**: three new buttons (A−, A, A+) in the toolbar to decrease, reset, and increase the panel font size. The setting persists across sessions.
+- **Separate font size settings**: sidebar and custom editor have independent font size settings (`fontSizeSidebar` default 12px, `fontSizeEditor` default 13px).
+- **Responsive sidebar layout**: comprehensive CSS rules for narrow widths — stats grid wraps into rows, header stacks vertically, filters/controls compact, items and modules reduce padding.
+
+### Changed
+
+- **Tab replacement UX**: clicking "Show Panel" on an active markdown file now replaces the text editor tab in-place using `tabGroups.close()` + `vscode.openWith` + `moveActiveEditor`, preserving tab position.
+- **"Use Active Editor" with custom editor support**: the sidebar button now detects files open in custom editors via the `TabGroups` API (fallback when `activeTextEditor` is undefined).
+- **Updated button icons**: Use Active Editor → `↙`, Choose File → `…`, Clear → `🗑`, Open File → `Raw ↗`.
+- **Stats cards layout**: switched from flexbox to CSS Grid (`auto-fit`) for natural wrapping at any width without clipping.
+- **Button overflow fix**: `white-space: nowrap` on secondary buttons prevents icon line-break; `flex-wrap` on header actions prevents clipping in narrow sidebars.
+
+### Fixed
+
+- **Extension activation**: added `onLanguage:markdown` activation event so the context key and action bar button are available immediately when opening any markdown file.
+- **Custom editor toolbar**: file-selection buttons (Use Active, Choose File, Clear) and drop overlay are hidden when the panel is bound to a fixed file (custom editor mode).
+
 ## [0.2.1] - 2026-06-07
 
 ### Changed
