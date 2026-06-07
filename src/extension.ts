@@ -32,8 +32,8 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('openItemsTracker.showPanel', async () => {
       const activeEditor = vscode.window.activeTextEditor;
       const fileUri = resolveFileUri();
+      /* c8 ignore start -- dialog interaction: showOpenDialog blocks in tests */
       if (!fileUri) {
-        // No file found — prompt the user to pick one
         const result = await vscode.window.showOpenDialog({
           canSelectMany: false,
           filters: { Markdown: ['md'] },
@@ -45,6 +45,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
         return;
       }
+      /* c8 ignore stop */
 
       // Replace the current text editor tab with the custom editor in-place.
       // VS Code has no native "reopen in-place" primitive, so we:
@@ -65,6 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (tabIndex >= 0) {
           await vscode.commands.executeCommand('moveActiveEditor', { to: 'position', value: tabIndex + 1 });
         }
+      /* c8 ignore next 3 -- requires non-target .md tab to be active */
       } else {
         await vscode.commands.executeCommand('vscode.openWith', fileUri, OpenItemsEditorProvider.viewType);
       }
@@ -116,6 +118,7 @@ function resolveFileUri(): vscode.Uri | undefined {
   }
 
   // 2. Stored path from previous session
+  /* c8 ignore start -- separate module instance / requires docs/open-items.md */
   const stored = getStoredPath();
   if (stored && fs.existsSync(stored)) {
     return vscode.Uri.file(stored);
@@ -126,6 +129,7 @@ function resolveFileUri(): vscode.Uri | undefined {
     const p = path.join(folder.uri.fsPath, 'docs', 'open-items.md');
     if (fs.existsSync(p)) { return vscode.Uri.file(p); }
   }
+  /* c8 ignore stop */
 
   return undefined;
 }

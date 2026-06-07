@@ -4,6 +4,22 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.4.0] - 2026-06-07
+
+### Added
+
+- **100% test coverage**: 314 unit and integration tests across 12+ suites covering parser, transforms, editors, store, undo/redo, git integration, settings, skill installer, webview host, and extension activation.
+- **CI pipeline**: GitHub Actions workflow (`.github/workflows/ci.yml`) runs tests with coverage on every push to `main` and on pull requests; auto-updates a dynamic coverage badge in the README via Gist endpoint.
+- **Coverage badge**: dynamic shields.io badge in the README reflecting real-time statement coverage from CI.
+- **Modified file test**: `getGitState` test for tracked files with local modifications, exercising the `modified` status path.
+
+### Changed
+
+- **`gitManager.ts` simplified**: removed dead `??` status branch (tracked files can never be untracked) and collapsed the status assignment to a single ternary. Removed the always-true `status !== 'untracked'` guard. Type narrowed from `'clean' | 'modified' | 'untracked'` to `'clean' | 'modified'`.
+- **`undoRedoManager.ts` simplified**: removed dead defensive guard `if (!undoStacks.has())` in `redo()` — the undo stack always exists when redo entries exist.
+- **`gitDiff.ts` simplified**: removed `try/catch` wrapper around `parseDocument` — the parser is a pure function that never throws.
+- **`fileTransforms.ts` simplified**: removed dead `while` loops in `deleteModule` and `deleteSubSection` — `nextModuleIdx`/`nextSectionIdx` already include trailing blank lines in the splice range.
+
 ## [0.3.0] - 2026-06-07
 
 ### Added

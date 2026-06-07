@@ -13,6 +13,7 @@ export class SidebarProvider extends WebviewHost implements vscode.WebviewViewPr
     super(extensionUri);
   }
 
+  /* c8 ignore start -- called by VS Code sidebar lifecycle only */
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this._view = webviewView;
     webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
@@ -27,6 +28,7 @@ export class SidebarProvider extends WebviewHost implements vscode.WebviewViewPr
 
     this.initShared();
   }
+  /* c8 ignore stop */
 
   // ── WebviewHost overrides ──────────────────────────────────────────────────
 

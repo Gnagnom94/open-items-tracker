@@ -89,15 +89,43 @@ export function computeGitDiff(
     return { isRepo, status, stats, itemStatus, itemDiffHtml, itemNoteDiffHtml, deletedItems };
   }
 
-  try {
-    const headDoc = parseDocument(headContent);
+  const headDoc = parseDocument(headContent);
 
-    for (const curMod of currentDoc.modules) {
-      const headMod = headDoc.modules.find(m => m.title === curMod.title);
+  for (const curMod of currentDoc.modules) {
+    const headMod = headDoc.modules.find(m => m.title === curMod.title);
 
-      // Diff module items
-      const modDiff = diffItemList(curMod.items, headMod ? headMod.items : []);
-      for (const item of modDiff.currentWithGit) {
+    // Diff module items
+    const modDiff = diffItemList(curMod.items, headMod ? headMod.items : []);
+    for (const item of modDiff.currentWithGit) {
+      itemStatus[item.rawLine] = item.gitStatus;
+      if (item.gitStatus === 'added') {
+        stats.added++;
+      } else if (item.gitStatus === 'modified') {
+        stats.modified++;
+        if (item.headText && item.headText !== item.text) {
+          itemDiffHtml[item.rawLine] = diffTextInline(item.headText, item.text);
+        }
+        if (item.headNote !== item.note) {
+          if (item.headNote && item.note) {
+            itemNoteDiffHtml[item.rawLine] = diffTextInline(item.headNote, item.note);
+          } else if (item.note) {
+            itemNoteDiffHtml[item.rawLine] = `<ins class="git-diff-ins">${escapeHtml(item.note)}</ins>`;
+          } else if (item.headNote) {
+            itemNoteDiffHtml[item.rawLine] = `<del class="git-diff-del">${escapeHtml(item.headNote)}</del>`;
+          }
+        }
+      }
+    }
+    if (modDiff.deleted.length > 0) {
+      deletedItems[curMod.rawLine] = modDiff.deleted;
+      stats.deleted += modDiff.deleted.length;
+    }
+
+    // Diff subsections
+    for (const curSub of curMod.subSections) {
+      const headSub = headMod ? headMod.subSections.find(s => s.title === curSub.title) : undefined;
+      const subDiff = diffItemList(curSub.items, headSub ? headSub.items : []);
+      for (const item of subDiff.currentWithGit) {
         itemStatus[item.rawLine] = item.gitStatus;
         if (item.gitStatus === 'added') {
           stats.added++;
@@ -117,43 +145,11 @@ export function computeGitDiff(
           }
         }
       }
-      if (modDiff.deleted.length > 0) {
-        deletedItems[curMod.rawLine] = modDiff.deleted;
-        stats.deleted += modDiff.deleted.length;
-      }
-
-      // Diff subsections
-      for (const curSub of curMod.subSections) {
-        const headSub = headMod ? headMod.subSections.find(s => s.title === curSub.title) : undefined;
-        const subDiff = diffItemList(curSub.items, headSub ? headSub.items : []);
-        for (const item of subDiff.currentWithGit) {
-          itemStatus[item.rawLine] = item.gitStatus;
-          if (item.gitStatus === 'added') {
-            stats.added++;
-          } else if (item.gitStatus === 'modified') {
-            stats.modified++;
-            if (item.headText && item.headText !== item.text) {
-              itemDiffHtml[item.rawLine] = diffTextInline(item.headText, item.text);
-            }
-            if (item.headNote !== item.note) {
-              if (item.headNote && item.note) {
-                itemNoteDiffHtml[item.rawLine] = diffTextInline(item.headNote, item.note);
-              } else if (item.note) {
-                itemNoteDiffHtml[item.rawLine] = `<ins class="git-diff-ins">${escapeHtml(item.note)}</ins>`;
-              } else if (item.headNote) {
-                itemNoteDiffHtml[item.rawLine] = `<del class="git-diff-del">${escapeHtml(item.headNote)}</del>`;
-              }
-            }
-          }
-        }
-        if (subDiff.deleted.length > 0) {
-          deletedItems[curSub.rawLine] = subDiff.deleted;
-          stats.deleted += subDiff.deleted.length;
-        }
+      if (subDiff.deleted.length > 0) {
+        deletedItems[curSub.rawLine] = subDiff.deleted;
+        stats.deleted += subDiff.deleted.length;
       }
     }
-  } catch {
-    // Fail-safe: if parsing HEAD fails, fall back to empty diff
   }
 
   return { isRepo, status, stats, itemStatus, itemDiffHtml, itemNoteDiffHtml, deletedItems };

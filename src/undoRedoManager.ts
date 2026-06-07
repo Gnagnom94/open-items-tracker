@@ -49,9 +49,6 @@ export class UndoRedoManager {
     if (!redoStack || redoStack.length === 0) { return undefined; }
 
     const nextContent = redoStack.pop()!;
-    if (!this.undoStacks.has(filePath)) {
-      this.undoStacks.set(filePath, []);
-    }
     this.undoStacks.get(filePath)!.push(currentContent);
 
     return nextContent;

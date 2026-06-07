@@ -231,10 +231,6 @@ export function deleteModule(moduleRawLine: string): LinesTransform {
     if (headerIdx === -1) { return result; }
     const endIdx = nextModuleIdx(result, headerIdx + 1);
     result.splice(headerIdx, endIdx - headerIdx);
-    // trim leading blank lines left behind
-    while (headerIdx < result.length && result[headerIdx].trim() === '') {
-      result.splice(headerIdx, 1);
-    }
     return result;
   };
 }
@@ -262,9 +258,6 @@ export function deleteSubSection(subRawLine: string): LinesTransform {
     if (headerIdx === -1) { return result; }
     const endIdx = nextSectionIdx(result, headerIdx + 1);
     result.splice(headerIdx, endIdx - headerIdx);
-    while (headerIdx < result.length && result[headerIdx].trim() === '') {
-      result.splice(headerIdx, 1);
-    }
     return result;
   };
 }

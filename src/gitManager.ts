@@ -41,20 +41,8 @@ export async function getGitState(filePath: string): Promise<GitState> {
   }
 
   const statusOutput = await runCmd(`git status --porcelain "${file}"`, dir);
-  let status: 'clean' | 'modified' | 'untracked' = 'clean';
-
-  if (statusOutput) {
-    if (statusOutput.startsWith('??')) {
-      status = 'untracked';
-    } else {
-      status = 'modified';
-    }
-  }
-
-  let headContent = '';
-  if (status !== 'untracked') {
-    headContent = await runCmd(`git show HEAD:"${gitPath}"`, dir);
-  }
+  const status: 'clean' | 'modified' = statusOutput ? 'modified' : 'clean';
+  const headContent = await runCmd(`git show HEAD:"${gitPath}"`, dir);
 
   return {
     isRepo: true,

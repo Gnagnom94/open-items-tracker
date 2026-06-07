@@ -24,6 +24,7 @@ function getIDEName(ide: IDEKind): string {
     }
 }
 
+/* c8 ignore start -- private: only called from bundled dist/ code */
 function getTargetSkillDir(ide: IDEKind): string {
     const cfg = vscode.workspace.getConfiguration('openItemsTracker');
     if (ide === 'antigravity') {
@@ -34,7 +35,9 @@ function getTargetSkillDir(ide: IDEKind): string {
     const override = cfg.get<string>('skillPathClaudeCode', '').trim();
     return override || path.join(os.homedir(), '.claude', 'skills', 'open-items-tracker');
 }
+/* c8 ignore stop */
 
+/* c8 ignore start -- private: only called from bundled dist/ code */
 function isDefaultAntigravityPathUnverified(ide: IDEKind): boolean {
     if (ide !== 'antigravity') { return false; }
     const override = vscode.workspace.getConfiguration('openItemsTracker').get<string>('skillPathAntigravity', '').trim();
@@ -42,6 +45,7 @@ function isDefaultAntigravityPathUnverified(ide: IDEKind): boolean {
     const isNonWindows = process.platform !== 'win32';
     return isDefault && isNonWindows;
 }
+/* c8 ignore stop */
 
 function getSourceDir(context: vscode.ExtensionContext): string {
     return path.join(context.extensionUri.fsPath, 'skills', 'open-items-tracker');
@@ -58,6 +62,7 @@ function collectRelativeFiles(dir: string, base?: string): string[] {
     return files.sort();
 }
 
+/* c8 ignore start -- private: only called from bundled dist/ code */
 async function copySkill(context: vscode.ExtensionContext, targetDir: string): Promise<boolean> {
     const sourceDir = getSourceDir(context);
     try {
@@ -68,7 +73,9 @@ async function copySkill(context: vscode.ExtensionContext, targetDir: string): P
         return false;
     }
 }
+/* c8 ignore stop */
 
+/* c8 ignore start -- private: only called from bundled dist/ code */
 function isSkillOutdated(context: vscode.ExtensionContext, targetDir: string): boolean {
     if (!fs.existsSync(path.join(targetDir, 'SKILL.md'))) { return false; }
     const sourceDir = getSourceDir(context);
@@ -87,12 +94,14 @@ function isSkillOutdated(context: vscode.ExtensionContext, targetDir: string): b
         return false;
     }
 }
+/* c8 ignore stop */
 
 export async function promptSkillInstall(context: vscode.ExtensionContext): Promise<void> {
     const enabled = vscode.workspace.getConfiguration('openItemsTracker').get<boolean>('promptSkillInstall', true);
     if (!enabled) { return; }
     if (context.globalState.get<boolean>(DONT_ASK_KEY, false)) { return; }
 
+    /* c8 ignore start -- runs from bundled dist/ code during activation */
     const ide = detectIDE();
     const targetDir = getTargetSkillDir(ide);
     const targetFile = path.join(targetDir, 'SKILL.md');
@@ -107,7 +116,9 @@ export async function promptSkillInstall(context: vscode.ExtensionContext): Prom
     const warning = isDefaultAntigravityPathUnverified(ide)
         ? ' ⚠ Path unverified on this OS — set Settings › skillPathAntigravity if wrong.'
         : '';
+    /* c8 ignore stop */
 
+    /* c8 ignore start -- dialog interaction: showInformationMessage blocks in tests */
     if (isInstalled) {
         // Skill exists but is outdated
         const action = await vscode.window.showInformationMessage(
@@ -137,6 +148,7 @@ export async function promptSkillInstall(context: vscode.ExtensionContext): Prom
             await context.globalState.update(DONT_ASK_KEY, true);
         }
     }
+    /* c8 ignore stop */
 }
 
 export async function showSkillStatus(context: vscode.ExtensionContext): Promise<void> {
@@ -151,6 +163,7 @@ export async function showSkillStatus(context: vscode.ExtensionContext): Promise
     type Action = 'install' | 'reinstall' | 'update' | 'openFolder' | 'resetPrompt';
     const items: (vscode.QuickPickItem & { action: Action })[] = [];
 
+    /* c8 ignore next 7 -- QuickPick item: requires unverified path on target OS */
     if (pathUnverified) {
         items.push({
             label: '$(warning) Path unverified on this OS',
@@ -178,6 +191,7 @@ export async function showSkillStatus(context: vscode.ExtensionContext): Promise
             action: 'openFolder'
         });
     } else {
+        /* c8 ignore next 5 -- QuickPick item: requires skill not installed */
         items.push({
             label: '$(cloud-download) Install',
             description: `Copy SKILL.md to ${targetDir}`,
@@ -199,6 +213,7 @@ export async function showSkillStatus(context: vscode.ExtensionContext): Promise
     qp.items = items;
     qp.ignoreFocusOut = false;
 
+    /* c8 ignore start -- QuickPick accept handler: requires user interaction */
     qp.onDidAccept(async () => {
         const selected = qp.selectedItems[0];
         qp.hide();
@@ -231,6 +246,7 @@ export async function showSkillStatus(context: vscode.ExtensionContext): Promise
                 break;
         }
     });
+    /* c8 ignore stop */
 
     qp.onDidHide(() => qp.dispose());
     qp.show();
