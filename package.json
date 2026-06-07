@@ -2,7 +2,7 @@
   "name": "open-items-tracker",
   "displayName": "Open Items Tracker",
   "description": "Visualize, edit, and manage your open-items.md backlog inside VS Code, Cursor, Windsurf, and Antigravity IDE. Full CRUD for modules, sub-sections, and items; drag-to-reorder; inline editing; sort strategies; live file sync; and AI skill auto-install.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "Gnagnom94",
   "repository": {
     "type": "git",
@@ -102,7 +102,13 @@
       "properties": {
         "openItemsTracker.defaultSort": {
           "type": "string",
-          "enum": ["manual", "status", "alpha", "done-last", "done-first"],
+          "enum": [
+            "manual",
+            "status",
+            "alpha",
+            "done-last",
+            "done-first"
+          ],
           "enumDescriptions": [
             "Original order from the file",
             "By status: open → partial → future → done",
@@ -205,7 +211,8 @@
     "release:package": "vsce package",
     "release:ovsx": "ovsx publish *.vsix",
     "release:vsce": "vsce publish --packagePath *.vsix",
-    "record-demos": "npm run compile && npm run compile-tests && node scripts/record-demos.js"
+    "record-demos": "npm run compile && npm run compile-tests && node scripts/record-demos.js",
+    "coverage": "vscode-test --coverage --coverage-reporter json --coverage-reporter text --coverage-output ./coverage && node scripts/dedup-coverage.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

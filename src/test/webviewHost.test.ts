@@ -642,14 +642,50 @@ suite('WebviewHost Test Suite', () => {
 
 suite('SidebarProvider Test Suite', () => {
 
+  let ext: vscode.Extension<unknown>;
+
+  suiteSetup(async () => {
+    ext = vscode.extensions.getExtension('Gnagnom94.open-items-tracker')!;
+    await ext.activate();
+  });
+
   test('viewType is correct', () => {
     assert.strictEqual(SidebarProvider.viewType, 'openItemsTracker.sidebar');
   });
 
   test('constructor does not throw', () => {
-    const ext = vscode.extensions.getExtension('Gnagnom94.open-items-tracker')!;
     const provider = new SidebarProvider(ext.extensionUri);
     assert.ok(provider);
+    provider.dispose();
+  });
+
+  test('resolveWebviewView — exercises getWebview and setHtml', async () => {
+    const provider = new SidebarProvider(ext.extensionUri);
+
+    // Create a mock WebviewView with the minimum interface that
+    // resolveWebviewView needs
+    const mockWebview = createMockWebview();
+    const mockWebviewView: vscode.WebviewView = {
+      viewType: SidebarProvider.viewType,
+      webview: mockWebview,
+      title: undefined,
+      description: undefined,
+      badge: undefined,
+      visible: true,
+      onDidDispose: new vscode.EventEmitter<void>().event,
+      onDidChangeVisibility: new vscode.EventEmitter<void>().event,
+      show: () => {},
+    } as unknown as vscode.WebviewView;
+
+    // Call resolveWebviewView — this triggers initShared() → render() → getWebview()/setHtml()
+    provider.resolveWebviewView(mockWebviewView);
+
+    // Wait for render cycle to complete
+    await new Promise(r => setTimeout(r, 300));
+
+    // Verify the webview HTML was set (setHtml was called)
+    assert.ok(mockWebview.html.length > 0, 'setHtml should have been called setting webview.html');
+
     provider.dispose();
   });
 });
@@ -928,3 +964,102 @@ function createMockWebview(): vscode.Webview {
   } as unknown as vscode.Webview;
 }
 
+// ── OpenItemsPanel ───────────────────────────────────────────────────────────
+
+suite('OpenItemsPanel Test Suite', () => {
+
+  let ext: vscode.Extension<unknown>;
+
+  suiteSetup(async () => {
+    ext = vscode.extensions.getExtension('Gnagnom94.open-items-tracker')!;
+    await ext.activate();
+  });
+
+  teardown(async () => {
+    // Ensure any open panel is disposed after each test
+    const { OpenItemsPanel } = require('../panel') as typeof import('../panel');
+    if (OpenItemsPanel.currentPanel) {
+      OpenItemsPanel.currentPanel.dispose();
+    }
+    setStoredPath(undefined);
+  });
+
+  test('createOrShow — creates a new panel', async () => {
+    const { OpenItemsPanel } = require('../panel') as typeof import('../panel');
+    assert.strictEqual(OpenItemsPanel.currentPanel, undefined);
+    OpenItemsPanel.createOrShow(ext.extensionUri);
+    assert.ok(OpenItemsPanel.currentPanel, 'Panel should be created');
+    // Wait for init
+    await new Promise(r => setTimeout(r, 200));
+  });
+
+  test('createOrShow — works without active text editor (L15 branch)', async () => {
+    // Close all editors so activeTextEditor is undefined
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    await new Promise(r => setTimeout(r, 100));
+
+    const { OpenItemsPanel } = require('../panel') as typeof import('../panel');
+    // Ensure no panel exists
+    if (OpenItemsPanel.currentPanel) {
+      OpenItemsPanel.currentPanel.dispose();
+    }
+    OpenItemsPanel.createOrShow(ext.extensionUri);
+    assert.ok(OpenItemsPanel.currentPanel, 'Panel should be created even without active editor');
+    await new Promise(r => setTimeout(r, 200));
+  });
+
+  test('createOrShow — with filePath sets stored path', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oit-panel-test-'));
+    const tmpFile = path.join(tmpDir, 'panel-test.md');
+    fs.writeFileSync(tmpFile, '## Module\n- [ ] **Task**', 'utf8');
+
+    try {
+      const { OpenItemsPanel } = require('../panel') as typeof import('../panel');
+      OpenItemsPanel.createOrShow(ext.extensionUri, tmpFile);
+      assert.ok(OpenItemsPanel.currentPanel);
+      await new Promise(r => setTimeout(r, 200));
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch { /* */ }
+      try { fs.rmdirSync(tmpDir); } catch { /* */ }
+    }
+  });
+
+  test('createOrShow — reveals existing panel', async () => {
+    const { OpenItemsPanel } = require('../panel') as typeof import('../panel');
+    // Create first panel
+    OpenItemsPanel.createOrShow(ext.extensionUri);
+    assert.ok(OpenItemsPanel.currentPanel);
+    const first = OpenItemsPanel.currentPanel;
+    await new Promise(r => setTimeout(r, 200));
+    // Call again — should reveal, not create new
+    OpenItemsPanel.createOrShow(ext.extensionUri);
+    assert.strictEqual(OpenItemsPanel.currentPanel, first, 'Should reuse existing panel');
+  });
+
+  test('createOrShow — reveals existing panel with filePath', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oit-panel-test-'));
+    const tmpFile = path.join(tmpDir, 'panel-test.md');
+    fs.writeFileSync(tmpFile, '## Module\n- [ ] **Task**', 'utf8');
+
+    try {
+      const { OpenItemsPanel } = require('../panel') as typeof import('../panel');
+      OpenItemsPanel.createOrShow(ext.extensionUri);
+      assert.ok(OpenItemsPanel.currentPanel);
+      await new Promise(r => setTimeout(r, 200));
+      // Reveal with filePath
+      OpenItemsPanel.createOrShow(ext.extensionUri, tmpFile);
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch { /* */ }
+      try { fs.rmdirSync(tmpDir); } catch { /* */ }
+    }
+  });
+
+  test('dispose — clears currentPanel', async () => {
+    const { OpenItemsPanel } = require('../panel') as typeof import('../panel');
+    OpenItemsPanel.createOrShow(ext.extensionUri);
+    assert.ok(OpenItemsPanel.currentPanel);
+    await new Promise(r => setTimeout(r, 200));
+    OpenItemsPanel.currentPanel!.dispose();
+    assert.strictEqual(OpenItemsPanel.currentPanel, undefined, 'Panel should be cleared after dispose');
+  });
+});

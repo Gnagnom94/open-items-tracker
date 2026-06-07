@@ -266,4 +266,23 @@ suite('Parser Test Suite', () => {
     const doc = parseDocument(content);
     assert.strictEqual(doc.modules[0].items[0].rawLine, line);
   });
+
+  // ── Branch coverage: parseItem returns null for non-standard checkbox (L7) ──
+
+  test('parseDocument — non-standard checkbox like - [?] is ignored', () => {
+    const content = '## M\n- [?] some weird checkbox\n- [ ] **Valid**';
+    const doc = parseDocument(content);
+    assert.strictEqual(doc.modules[0].items.length, 1);
+    assert.strictEqual(doc.modules[0].items[0].text, 'Valid');
+  });
+
+  // ── Branch coverage: note that is only emoji reduces to undefined (L31) ──
+
+  test('parseDocument — open item note containing only emoji becomes undefined', () => {
+    const content = '## M\n- [ ] **Task** — 🔄';
+    const doc = parseDocument(content);
+    const item = doc.modules[0].items[0];
+    // The note is "🔄" which after emoji stripping becomes empty → undefined
+    assert.strictEqual(item.note, undefined);
+  });
 });

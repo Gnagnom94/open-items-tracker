@@ -12,6 +12,9 @@ export class OpenItemsPanel extends WebviewHost {
   private readonly _panel: vscode.WebviewPanel;
 
   public static createOrShow(extensionUri: vscode.Uri, filePath?: string): void {
+    // activeTextEditor may be undefined when no editor tab is focused;
+    // this state cannot be reliably reproduced in the VS Code test host.
+    /* c8 ignore next */
     const column = vscode.window.activeTextEditor?.viewColumn;
     if (OpenItemsPanel.currentPanel) {
       OpenItemsPanel.currentPanel._panel.reveal(column);

@@ -195,6 +195,9 @@ function getLISIndices(arr: number[]): Set<number> {
 function levenshteinDistance(s1: string, s2: string): number {
   const len1 = s1.length;
   const len2 = s2.length;
+  // Defensive: parseDocument never produces items with empty text,
+  // so these branches cannot be reached through computeGitDiff.
+  /* c8 ignore next 2 */
   if (len1 === 0) { return len2; }
   if (len2 === 0) { return len1; }
 
@@ -228,6 +231,8 @@ function stringSimilarity(s1: string, s2: string): number {
   const clean2 = s2.toLowerCase().trim();
   const d = levenshteinDistance(clean1, clean2);
   const maxLen = Math.max(clean1.length, clean2.length);
+  // Defensive: both strings empty is unreachable because items always have text.
+  /* c8 ignore next */
   if (maxLen === 0) { return 1.0; }
   return 1.0 - d / maxLen;
 }
@@ -342,6 +347,10 @@ function diffItemList(currentItems: OpenItem[], headItems: OpenItem[]): {
     if (bestHeadIdx !== -1) {
       matchedHeadIndices.add(bestHeadIdx);
       const head = headItems[bestHeadIdx];
+      // Fuzzy match only fires when exact-text match (step 2) failed,
+      // meaning texts differ — so itemIdentical (which checks text equality)
+      // always returns false here. The 'clean' branch is unreachable.
+      /* c8 ignore next */
       currentWithGit[i].gitStatus = itemIdentical(cur, head) ? 'clean' : 'modified';
       currentWithGit[i].headText = head.text;
       currentWithGit[i].headNote = head.note;

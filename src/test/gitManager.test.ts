@@ -28,13 +28,15 @@ suite('gitManager Test Suite', () => {
     assert.ok(state.gitPath);
   });
 
-  test('getGitState — tracked clean file has headContent', async () => {
+  test('getGitState — clean file returns status clean', async () => {
+    // Use .gitignore which is committed and never modified by tests
     const projectRoot = path.resolve(__dirname, '..', '..');
-    const filePath = path.join(projectRoot, 'package.json');
+    const filePath = path.join(projectRoot, '.gitignore');
+    // .gitignore should be committed and unmodified during test runs
     const state = await getGitState(filePath);
-    if (state.status === 'clean') {
-      assert.ok(state.headContent, 'clean tracked file should have headContent');
-    }
+    assert.strictEqual(state.isRepo, true);
+    assert.strictEqual(state.status, 'clean', '.gitignore should be clean (committed, unmodified)');
+    assert.ok(state.headContent, 'clean tracked file should have headContent');
   });
 
   test('getGitState — non-repo directory returns isRepo false', async () => {

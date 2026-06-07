@@ -504,4 +504,53 @@ suite('fileTransforms Test Suite', () => {
     const result = toggleItem('- [x] plain done text')(lines);
     assert.strictEqual(result[1], '- [ ] **plain done text**');
   });
+
+  // ── Branch coverage: extractFromOpen without bold, with dash (L40) ──
+
+  test('toggleItem — open item without bold but with dash uses content before dash', () => {
+    const lines = ['## M', '- [ ] plain text — my note'];
+    const result = toggleItem('- [ ] plain text — my note')(lines);
+    assert.ok(result[1].includes('~~**plain text**~~'));
+    assert.ok(result[1].includes('my note'));
+  });
+
+  // ── Branch coverage: extractFromOpen emoji-only note becomes undefined (L43) ──
+
+  test('toggleItem — open item whose note is only emoji produces no note in done format', () => {
+    const lines = ['## M', '- [ ] **Task** — 🔄'];
+    const result = toggleItem('- [ ] **Task** — 🔄')(lines);
+    // Note " 🔄" after emoji strip is empty → treated as no note
+    assert.ok(result[1].includes('~~**Task**~~'));
+    assert.ok(!result[1].includes('🔄'));
+    // Should end with "done (YYYY-MM-DD)." without trailing note
+    assert.ok(result[1].match(/done \(\d{4}-\d{2}-\d{2}\)\.$/));
+  });
+
+  // ── Branch coverage: editItemNote done item fallback (no date match) (L132) ──
+
+  test('editItemNote — done item without date pattern, remove note via empty string', () => {
+    // This done item doesn't match the standard "— done (YYYY-MM-DD)." pattern
+    // so it falls through to the dashIdx fallback
+    const lines = ['## M', '- [x] ~~**Task**~~ — manual completion'];
+    const result = editItemNote('- [x] ~~**Task**~~ — manual completion', '')(lines);
+    assert.strictEqual(result[1], '- [x] ~~**Task**~~');
+  });
+
+  // ── Branch coverage: editHeader without hash prefix → ?? fallback (L150) ──
+
+  test('editHeader — rawLine without leading hash uses default "## " prefix', () => {
+    // A line that exists in the array but doesn't start with #
+    const lines = ['NoHashTitle', '- [ ] **Task**'];
+    const result = editHeader('NoHashTitle', 'New Title')(lines);
+    assert.strictEqual(result[0], '## New Title');
+  });
+
+  // ── Branch coverage: extractFromOpen no bold, no dash → use full content (L40) ──
+
+  test('toggleItem — open item without bold and without dash uses full content as text', () => {
+    const lines = ['## M', '- [ ] plain text without dash'];
+    const result = toggleItem('- [ ] plain text without dash')(lines);
+    assert.ok(result[1].includes('~~**plain text without dash**~~'));
+    assert.ok(result[1].includes('done ('));
+  });
 });

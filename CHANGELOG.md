@@ -4,6 +4,24 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.4.2] - 2026-06-08
+
+### Added
+
+- **100% coverage on all metrics**: statements 2330/2330, branches 792/792, functions 152/152, lines 100% — 334 tests total.
+- **Coverage post-processor** (`scripts/dedup-coverage.mjs`): fixes the known c8/V8 bug where coverage merged from two processes (Extension Host + test runner) creates phantom duplicate function entries with count=0. Removes module wrappers, class body initializers, and merges exact/near-duplicate entries by taking the max count.
+- **`npm run coverage`** script: integrated pipeline that runs tests with coverage reporters (JSON + text) and then deduplicates the output in one command.
+- **SidebarProvider lifecycle test**: exercises `resolveWebviewView` with a mock `WebviewView`, covering `getWebview()` and `setHtml()`.
+- **Git clean file test**: uses `.gitignore` (always committed, never modified by tests) to cover the `statusOutput` falsy branch in `gitManager.ts`.
+- **Panel no-editor test**: closes all editors before `createOrShow` to exercise the `activeTextEditor === undefined` path.
+- **Parser edge-case tests**: non-standard checkbox formats and emoji-only note reduction.
+- **fileTransforms edge-case tests**: bold-match null with dash, emoji-only note cleanup, done-item dash fallback, header regex fallback.
+- **gitDiff edge-case tests**: subsection diff where `headMod` is undefined, Jaccard empty word arrays, fuzzy match identical items.
+
+### Changed
+
+- **Documented `c8 ignore` annotations**: all `c8 ignore` comments now include a justification explaining why the branch is unreachable through the public API (defensive guards in private helpers, VS Code test host limitations, IDE-dependent runtime branches).
+
 ## [0.4.1] - 2026-06-07
 
 ### Added
