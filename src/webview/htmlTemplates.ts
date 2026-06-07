@@ -33,7 +33,8 @@ export function getHtml(
   settings: ExtensionSettings,
   historyState: HistoryState,
   gitState: RenderGitState,
-  isFixedFile = false
+  isFixedFile = false,
+  demoMode = false
 ): string {
   const n = nonce();
   const cssUri = getCssUri(webview, extensionUri);
@@ -53,7 +54,7 @@ export function getHtml(
   </div>`}
   <div id="app"></div>
   <script nonce="${n}">
-    window.__INIT_DATA__ = ${JSON.stringify({ data, settings, historyState, gitState, isFixedFile })};
+    window.__INIT_DATA__ = ${JSON.stringify({ data, settings, historyState, gitState, isFixedFile, demoMode })};
   </script>
   <script nonce="${n}" src="${scriptUri}"></script>
 </body>

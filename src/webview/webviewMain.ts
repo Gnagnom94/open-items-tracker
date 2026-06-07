@@ -27,6 +27,7 @@ interface InitData {
   historyState: HistoryState;
   gitState: RenderGitState;
   isFixedFile?: boolean;
+  demoMode?: boolean;
 }
 
 const initData: InitData = (window as unknown as { __INIT_DATA__: InitData }).__INIT_DATA__;
@@ -912,6 +913,98 @@ window.addEventListener('scroll', function () {
     }
   }
 });
+
+// ── Demo mode (messages from extension host for automated GIF recording) ─────
+// Handlers are only registered when demoMode is set in __INIT_DATA__ (which is
+// only injected when DEMO_OUTPUT_DIR is set in the extension host process).
+// This means zero demo code is active in production — no listener, no overhead.
+
+/* c8 ignore start -- demo recording only, not covered by unit tests */
+if (initData?.demoMode) {
+window.addEventListener('message', function (event) {
+  const msg = event.data;
+  if (!msg || typeof msg.command !== 'string' || msg.command.indexOf('demo:') !== 0) { return; }
+
+  switch (msg.command) {
+    case 'demo:sort': {
+      const sel = document.getElementById('sortSelect') as HTMLSelectElement | null;
+      if (sel) {
+        // Visually open the native dropdown picker for the recording
+        sel.focus();
+        try { sel.showPicker(); } catch (_e) { /* fallback: no visual picker */ }
+        // 800ms delay: allows the native dropdown to render before we programmatically select
+        setTimeout(function () {
+          sel.value = msg.value;
+          sel.dispatchEvent(new Event('change'));
+        }, 800);
+      }
+      break;
+    }
+    case 'demo:filter': {
+      const btn = document.querySelector('.filter-btn[data-filter="' + msg.value + '"]') as HTMLElement | null;
+      if (btn) { btn.click(); }
+      break;
+    }
+    case 'demo:search': {
+      const inp = document.getElementById('searchInput') as HTMLInputElement | null;
+      if (inp) { inp.value = msg.value; inp.dispatchEvent(new Event('input')); }
+      break;
+    }
+    case 'demo:fontSize': {
+      const id = msg.value === 'increase' ? 'fontIncBtn' : msg.value === 'decrease' ? 'fontDecBtn' : 'fontResetBtn';
+      const el = document.getElementById(id);
+      if (el) { el.click(); }
+      break;
+    }
+    case 'demo:click': {
+      const target = document.querySelector(msg.selector) as HTMLElement | null;
+      if (target) { target.click(); }
+      break;
+    }
+    case 'demo:scroll': {
+      window.scrollTo({ top: msg.y || 0, behavior: 'smooth' });
+      break;
+    }
+    case 'demo:inlineEdit': {
+      // Simulate: click on editable element → textarea appears → type new text → save
+      // msg.selector: CSS selector of the element to click (e.g. '.item-text-content')
+      // msg.itemIndex: 0-based index if multiple matches (default: 0)
+      // msg.newText: the text to type into the textarea
+      // msg.delay: ms between keystrokes (default: 60)
+      const editTargets = document.querySelectorAll(msg.selector) as NodeListOf<HTMLElement>;
+      const idx = msg.itemIndex || 0;
+      if (editTargets[idx]) {
+        const clickedElement = editTargets[idx];
+        clickedElement.click();
+        const keystrokeDelay = msg.delay || 60;
+        // 300ms delay: allows the click handler to create the textarea
+        setTimeout(function () {
+          // Scope to the clicked element's parent item to avoid targeting stale textareas
+          const container = clickedElement.closest('.item, .module-card, .sub-section') || document;
+          const ta = container.querySelector('.inline-edit-input') as HTMLTextAreaElement | null;
+          if (ta) {
+            ta.value = '';
+            const chars = String(msg.newText).split('');
+            let i = 0;
+            const typeInterval = setInterval(function () {
+              if (i < chars.length) {
+                ta.value += chars[i];
+                i++;
+              } else {
+                clearInterval(typeInterval);
+                // Wait a beat, then blur to save
+                setTimeout(function () { ta.blur(); }, 500);
+              }
+            }, keystrokeDelay);
+          }
+        }, 300);
+      }
+      break;
+    }
+  }
+});
+}
+/* c8 ignore stop */
 
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 

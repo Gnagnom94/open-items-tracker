@@ -308,7 +308,7 @@ export abstract class WebviewHost {
 
       const historyState = this.getHistoryState();
 
-      this.setHtml(getHtml(webview, this._extensionUri, doc, settings, historyState, gitState, this.isFixedFile()));
+      this.setHtml(getHtml(webview, this._extensionUri, doc, settings, historyState, gitState, this.isFixedFile(), !!process.env.DEMO_OUTPUT_DIR));
     } catch {
       this.setHtml(getErrorHtml(webview, this._extensionUri));
     }
@@ -331,6 +331,14 @@ export abstract class WebviewHost {
 
   protected tryAction(fn: () => void): void {
     try { fn(); } catch (e) { vscode.window.showErrorMessage(`Open Items Tracker: ${e}`); }
+  }
+
+  // ── Demo recording support ─────────────────────────────────────────────────
+
+  /* c8 ignore next 5 -- demo recording only */
+  /** Send a demo:* message to the webview (used by automated GIF recording). */
+  public postDemoMessage(msg: Record<string, unknown>): void {
+    this.getWebview()?.postMessage(msg);
   }
 
   public dispose(): void {

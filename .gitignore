@@ -7,3 +7,6 @@ node_modules
 coverage/
 coverage-report/
 coverage-report.zip
+.demo-workspace/
+media/demos/*.mp4
+media/demos/*_palette.png

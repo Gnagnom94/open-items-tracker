@@ -16,10 +16,11 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider(SidebarProvider.viewType, sidebarProvider)
   );
 
+  const editorProvider = new OpenItemsEditorProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(
       OpenItemsEditorProvider.viewType,
-      new OpenItemsEditorProvider(context.extensionUri),
+      editorProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
@@ -27,6 +28,24 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('openItemsTracker.skillStatus', () => showSkillStatus(context))
   );
+
+  /* c8 ignore start -- demo recording only, command not registered in production */
+  if (process.env.DEMO_OUTPUT_DIR) {
+    context.subscriptions.push(
+      vscode.commands.registerCommand('openItemsTracker._demoMessage', (msg: Record<string, unknown>) => {
+        // Try custom editor first (used by demo scenarios via vscode.openWith)
+        editorProvider.postDemoMessage(msg);
+
+        // Also try standalone panel and sidebar as fallback
+        const { OpenItemsPanel } = require('./panel') as typeof import('./panel');
+        if (OpenItemsPanel.currentPanel) {
+          OpenItemsPanel.currentPanel.postDemoMessage(msg);
+        }
+        sidebarProvider.postDemoMessage(msg);
+      })
+    );
+  }
+  /* c8 ignore stop */
 
   context.subscriptions.push(
     vscode.commands.registerCommand('openItemsTracker.showPanel', async () => {

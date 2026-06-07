@@ -4,6 +4,29 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.4.1] - 2026-06-07
+
+### Added
+
+- **README demo GIFs**: 12 animated GIFs showcasing every feature — stats dashboard (hero), panel views, file loading, checkbox toggle, status change, inline edit, add/delete, sort & filter, font size, drag & drop, git diff, and undo/redo. Each GIF uses a collapsible `<details>` block for progressive disclosure.
+- **Demo recording infrastructure**: automated GIF recording pipeline via `npm run record-demos` — launches the extension in a temporary workspace, records screen capture with `ffmpeg`, and generates optimized two-pass palette GIFs. Supports scenario filtering (`npm run record-demos -- sort-filter inline-edit`).
+- **Demo mode defense-in-depth**: three independent gates ensure demo code is completely inert in production:
+  1. `_demoMessage` command only registered when `DEMO_OUTPUT_DIR` env var is set (extension host)
+  2. `demoMode` flag propagated through `__INIT_DATA__` only when env var is set (HTML template)
+  3. Demo event listener only attached when `initData.demoMode === true` (webview JS)
+
+### Changed
+
+- **`.vscodeignore`**: excluded `scripts/**` and `media/demos/**` from the VSIX package to avoid shipping ~13 MB of dev tooling and GIF assets.
+- **`.vscode-test.mjs`**: test glob narrowed from `out/test/**/*.test.js` to `out/test/*.test.js` to exclude the demo test suite from the normal test runner.
+- **`tsconfig.json`**: documented the reason for `skipLibCheck: true` (upstream `lru-cache` ships broken `.d.ts` files).
+- **`customEditorProvider.ts`**: added safety documentation on `_lastHost` singleton (demo-only, not safe for multi-instance use).
+
+### Fixed
+
+- **`webviewMain.ts`**: replaced `var` with `const`/`let` in demo handlers for proper block scoping inside `switch` cases.
+- **`webviewMain.ts`**: scoped inline-edit textarea query to the clicked element's parent (`.item`, `.module-card`, or `.sub-section`) to avoid targeting stale textareas from previous edits.
+
 ## [0.4.0] - 2026-06-07
 
 ### Added

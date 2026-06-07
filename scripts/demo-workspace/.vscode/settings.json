@@ -1,0 +1,19 @@
+{
+  "workbench.colorTheme": "Default Dark+",
+  "editor.fontSize": 14,
+  "editor.minimap.enabled": false,
+  "editor.lineNumbers": "off",
+  "editor.glyphMargin": false,
+  "editor.folding": false,
+  "workbench.activityBar.location": "top",
+  "workbench.statusBar.visible": false,
+  "breadcrumbs.enabled": false,
+  "window.title": "${rootName}",
+  "openItemsTracker.fontSizeEditor": 13,
+  "openItemsTracker.fontSizeSidebar": 12,
+  "openItemsTracker.collapseByDefault": false,
+  "openItemsTracker.gitIntegration": true,
+  "openItemsTracker.gitHighlight": true,
+  "openItemsTracker.gitShowInlineDiff": true,
+  "openItemsTracker.promptSkillInstall": false
+}

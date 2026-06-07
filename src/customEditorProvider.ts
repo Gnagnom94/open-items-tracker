@@ -14,6 +14,13 @@ import type { HistoryState } from './shared/types';
 export class OpenItemsEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'openItemsTracker.markdownEditor';
 
+  /**
+   * Last active CustomEditorHost — used exclusively by demo:* recording commands.
+   * ⚠️ NOT safe for multi-instance use: only tracks the most recently opened editor.
+   * If two custom editors are open (split view), this points to whichever was last opened.
+   */
+  private static _lastHost: CustomEditorHost | null = null;
+
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
   /* c8 ignore start -- covered via bundled dist/ code, not out/ test build */
@@ -21,9 +28,21 @@ export class OpenItemsEditorProvider implements vscode.CustomTextEditorProvider 
     document: vscode.TextDocument,
     webviewPanel: vscode.WebviewPanel
   ): void {
-    new CustomEditorHost(this._extensionUri, webviewPanel, document);
+    const host = new CustomEditorHost(this._extensionUri, webviewPanel, document);
+    OpenItemsEditorProvider._lastHost = host;
+    webviewPanel.onDidDispose(() => {
+      if (OpenItemsEditorProvider._lastHost === host) {
+        OpenItemsEditorProvider._lastHost = null;
+      }
+    });
   }
   /* c8 ignore stop */
+
+  /* c8 ignore next 4 -- demo recording only */
+  /** Send a demo:* message to the active custom editor webview. */
+  public postDemoMessage(msg: Record<string, unknown>): void {
+    OpenItemsEditorProvider._lastHost?.postDemoMessage(msg);
+  }
 }
 
 // ── Custom Editor Host ───────────────────────────────────────────────────────
