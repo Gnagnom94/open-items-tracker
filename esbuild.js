@@ -3,7 +3,8 @@ const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
 async function main() {
-  const ctx = await esbuild.context({
+  // Extension host bundle (Node.js)
+  const extensionCtx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,
     format: 'cjs',
@@ -15,11 +16,25 @@ async function main() {
     external: ['vscode'],
     logLevel: 'warning',
   });
+
+  // Webview bundle (Browser)
+  const webviewCtx = await esbuild.context({
+    entryPoints: ['src/webview/webviewMain.ts'],
+    bundle: true,
+    format: 'iife',
+    minify: production,
+    sourcemap: !production,
+    sourcesContent: false,
+    platform: 'browser',
+    outfile: 'dist/webview.js',
+    logLevel: 'warning',
+  });
+
   if (watch) {
-    await ctx.watch();
+    await Promise.all([extensionCtx.watch(), webviewCtx.watch()]);
   } else {
-    await ctx.rebuild();
-    await ctx.dispose();
+    await Promise.all([extensionCtx.rebuild(), webviewCtx.rebuild()]);
+    await Promise.all([extensionCtx.dispose(), webviewCtx.dispose()]);
   }
 }
 

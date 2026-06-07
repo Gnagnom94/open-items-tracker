@@ -1,17 +1,8 @@
 import * as vscode from 'vscode';
+import type { SortStrategy, ExtensionSettings } from './shared/types';
 
-export type SortStrategy = 'manual' | 'status' | 'alpha' | 'done-last' | 'done-first';
-
-export interface ExtensionSettings {
-  defaultSort: SortStrategy;
-  collapseByDefault: boolean;
-  showDoneItems: boolean;
-  showFutureItems: boolean;
-  gitIntegration: boolean;
-  gitHighlight: boolean;
-  gitShowInlineDiff: boolean;
-  undoRedoStackSize: number;
-}
+// Re-export for backward compatibility
+export type { SortStrategy, ExtensionSettings };
 
 export function readSettings(): ExtensionSettings {
   const c = vscode.workspace.getConfiguration('openItemsTracker');

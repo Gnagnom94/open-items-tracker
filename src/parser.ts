@@ -1,39 +1,7 @@
-export type ItemStatus = 'done' | 'open' | 'partial' | 'future';
+import type { ItemStatus, OpenItem, SubSection, Module, ParsedDocument } from './shared/types';
 
-export interface OpenItem {
-  text: string;
-  status: ItemStatus;
-  note?: string;
-  date?: string;
-  rawLine: string;
-}
-
-export interface SubSection {
-  title: string;
-  rawLine: string;
-  items: OpenItem[];
-}
-
-export interface Module {
-  title: string;
-  rawLine: string;
-  context: string;
-  subSections: SubSection[];
-  items: OpenItem[];
-}
-
-export interface ParsedDocument {
-  lastUpdated?: string;
-  filePath?: string;
-  modules: Module[];
-  stats: {
-    total: number;
-    done: number;
-    open: number;
-    partial: number;
-    future: number;
-  };
-}
+// Re-export for backward compatibility
+export type { ItemStatus, OpenItem, SubSection, Module, ParsedDocument };
 
 function parseItem(line: string): OpenItem | null {
   if (!line.startsWith('- [x]') && !line.startsWith('- [ ]')) { return null; }

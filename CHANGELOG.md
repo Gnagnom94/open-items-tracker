@@ -4,6 +4,17 @@ All notable changes to the "open-items-tracker" extension will be documented in 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.1] - 2026-06-07
+
+### Changed
+
+- **Renderer split**: monolithic `renderer.ts` (1637 lines) decomposed into five focused modules under `src/webview/` — `gitDiff.ts`, `htmlTemplates.ts`, `webviewMain.ts`, `webviewStyles.ts`, and a barrel `index.ts`.
+- **Webview TypeScript entrypoint**: webview client JavaScript (previously an inline template literal) is now a typed TypeScript file bundled by esbuild with `platform: 'browser'` → `dist/webview.js`.
+- **External CSS**: webview styles extracted from an inline string to a standalone `media/webview.css` file loaded via `<link>`.
+- **Panel/Sidebar deduplication**: shared logic (~120 lines duplicated between `panel.ts` and `sidebarProvider.ts`) extracted into an abstract `WebviewHost` base class; `panel.ts` reduced by 79%, `sidebarProvider.ts` by 80%.
+- **Shared types**: common TypeScript interfaces moved to `src/shared/types.ts`, imported by both the extension host (Node) and webview client (browser).
+- **Dual esbuild build**: `esbuild.js` now builds two entrypoints in parallel — extension (Node/CJS) and webview (browser/IIFE).
+
 ## [0.2.0] - 2026-06-07
 
 ### Added

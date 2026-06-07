@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { undoRedoManager } from '../undoRedoManager';
-import { diffTextInline, computeGitDiff } from '../renderer';
+import { diffTextInline, computeGitDiff } from '../webview/gitDiff';
 import { parseDocument } from '../parser';
 
 suite('Unit Test Suite', () => {
